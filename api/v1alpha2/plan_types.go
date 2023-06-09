@@ -13,7 +13,7 @@ const (
 
 // PlanSpec defines the desired state of Plan
 type PlanSpec struct {
-	PlanName string `json:"planName,omitempty"`
+	Operations []OperationReference `json:"operations"`
 }
 
 // PlanStatus defines the observed state of Plan
