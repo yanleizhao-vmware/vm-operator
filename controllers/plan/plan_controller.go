@@ -11,7 +11,7 @@ import (
 
 	"github.com/go-logr/logr"
 
-	msv1a2 "github.com/vmware-tanzu/vm-operator/api/v1alpha2"
+	vmopv1 "github.com/vmware-tanzu/vm-operator/api/v1alpha1"
 	"github.com/vmware-tanzu/vm-operator/pkg/context"
 	"github.com/vmware-tanzu/vm-operator/pkg/record"
 
@@ -37,7 +37,7 @@ func (r *Reconciler) Reconcile(ctx goctx.Context, req ctrl.Request) (_ ctrl.Resu
 func AddToManager(ctx *context.ControllerManagerContext, mgr ctrl.Manager) error {
 
 	var (
-		controlledType     = &msv1a2.Plan{}
+		controlledType     = &vmopv1.Plan{}
 		controlledTypeName = reflect.TypeOf(controlledType).Elem().Name()
 
 		controllerNameShort = fmt.Sprintf("%s-controller", strings.ToLower(controlledTypeName))
