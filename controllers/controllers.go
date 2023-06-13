@@ -13,6 +13,7 @@ import (
 	"github.com/vmware-tanzu/vm-operator/controllers/contentlibrary/contentsource"
 	"github.com/vmware-tanzu/vm-operator/controllers/infracluster"
 	"github.com/vmware-tanzu/vm-operator/controllers/infraprovider"
+	"github.com/vmware-tanzu/vm-operator/controllers/operation"
 	"github.com/vmware-tanzu/vm-operator/controllers/plan"
 	"github.com/vmware-tanzu/vm-operator/controllers/providerconfigmap"
 	"github.com/vmware-tanzu/vm-operator/controllers/virtualmachine"
@@ -45,6 +46,9 @@ func AddToManager(ctx *context.ControllerManagerContext, mgr manager.Manager) er
 	}
 	if err := virtualmachinesetresourcepolicy.AddToManager(ctx, mgr); err != nil {
 		return errors.Wrap(err, "failed to initialize VirtualMachineSetResourcePolicy controller")
+	}
+	if err := operation.AddToManager(ctx, mgr); err != nil {
+		return errors.Wrap(err, "failed to initialize Plan controller")
 	}
 	if err := plan.AddToManager(ctx, mgr); err != nil {
 		return errors.Wrap(err, "failed to initialize Plan controller")
