@@ -12,6 +12,7 @@ import (
 	"github.com/vmware-tanzu/vm-operator/pkg/context"
 	"github.com/vmware-tanzu/vm-operator/pkg/record"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -26,6 +27,29 @@ type Reconciler struct {
 }
 
 func (r *Reconciler) reconcileImport(ctx goctx.Context, operation *vmopv1.Operation) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+	logger.Info("Reconciling import", "Operation", operation)
+
+	// Find the VM referenced by the Operation
+	vm := &vmopv1.VirtualMachine{}
+	if err := r.Get(ctx, client.ObjectKey{Name: operation.Spec.EntityName, Namespace: operation.Namespace}, vm); err != nil {
+		// Create a new VM.
+		vm = &vmopv1.VirtualMachine{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      operation.Spec.EntityName,
+				Namespace: operation.Namespace,
+			},
+			Spec: operation.Spec.VmSpec,
+		}
+		if err := r.Create(ctx, vm); err != nil {
+			logger.Error(err, "Failed to create VM referenced by Operation", "Operation", operation)
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{}, err
+	}
+
+	// Exit since VM already exists.
+	logger.Info("VM already exists", "VM", vm)
 	return ctrl.Result{}, nil
 }
 
