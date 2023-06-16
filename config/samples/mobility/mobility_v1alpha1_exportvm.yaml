@@ -1,0 +1,18 @@
+apiVersion: vmoperator.vmware.com/v1alpha1
+kind: Operation
+metadata:
+  name: export
+  namespace: mobility-service-0
+spec:
+  operationType: Export
+  entityName: centos-cloudinit-example
+---
+apiVersion: vmoperator.vmware.com/v1alpha1
+kind: Plan
+metadata:
+  name: exportvm-plan
+spec:
+  operations:
+    - kind: Operation
+      namespace: mobility-service-0
+      name: export
