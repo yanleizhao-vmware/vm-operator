@@ -96,6 +96,8 @@ const (
 	// this annotation to skip adding a default nic. VM Operator won't add default NIC to any existing VMs or new VMs
 	// with VirtualMachineNetworkInterfaces specified. This annotation is not required for such VMs.
 	NoDefaultNicAnnotation = GroupName + "/no-default-nic"
+
+	ExportAnnotation = GroupName + "/export"
 )
 
 // VirtualMachinePort is unused and can be considered deprecated.

@@ -325,7 +325,10 @@ func (r *Reconciler) ReconcileDelete(ctx *context.VirtualMachineContext) (reterr
 			r.Recorder.EmitEvent(ctx.VM, "Delete", reterr, false)
 		}()
 
-		if err := r.VMProvider.DeleteVirtualMachine(ctx, ctx.VM); err != nil {
+		// If VM is annotated with export annotation, do not delete the vm.
+		if _, ok := ctx.VM.Annotations[vmopv1.ExportAnnotation]; ok {
+			ctx.Logger.Info("Skipping deletion of VM since Export annotation is set on the VM")
+		} else if err := r.VMProvider.DeleteVirtualMachine(ctx, ctx.VM); err != nil {
 			ctx.Logger.Error(err, "Failed to delete VirtualMachine")
 			return err
 		}

@@ -32,6 +32,32 @@ func (r *Reconciler) reconcileImport(ctx goctx.Context, operation *vmopv1.Operat
 func (r *Reconciler) reconcileExport(ctx goctx.Context, operation *vmopv1.Operation) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	logger.Info("Reconciling export", "Operation", operation)
+
+	// Find the VM referenced by the Operation
+	vm := &vmopv1.VirtualMachine{}
+	if err := r.Get(ctx, client.ObjectKey{Name: operation.Spec.EntityName, Namespace: operation.Namespace}, vm); err != nil {
+		logger.Error(err, "Failed to find VM referenced by Operation", "Operation", operation)
+		return ctrl.Result{}, err
+	}
+
+	logger.Info("Reconciling export", "VM", vm)
+
+	// Add export annotation to VM
+	if vm.Annotations == nil {
+		vm.Annotations = make(map[string]string)
+	}
+	vm.Annotations[vmopv1.ExportAnnotation] = "true"
+	if err := r.Update(ctx, vm); err != nil {
+		logger.Error(err, "Failed to add export annotation to VM", "VM", vm)
+		return ctrl.Result{}, err
+	}
+
+	// Delete the VM
+	if err := r.Delete(ctx, vm); err != nil {
+		logger.Error(err, "Failed to delete VM referenced by Operation", "Operation", operation)
+		return ctrl.Result{}, err
+	}
+
 	return ctrl.Result{}, nil
 }
 
