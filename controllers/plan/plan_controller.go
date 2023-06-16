@@ -18,6 +18,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -29,7 +30,17 @@ type Reconciler struct {
 }
 
 func (r *Reconciler) Reconcile(ctx goctx.Context, req ctrl.Request) (_ ctrl.Result, reterr error) {
-	r.Logger.Info("Reconciling Plan")
+	logger := log.FromContext(ctx)
+	logger.Info("Reconciling plan", "request", req)
+
+	Plan := &vmopv1.Plan{}
+	if err := r.Get(ctx, req.NamespacedName, Plan); err != nil {
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	// Log the plan.
+	logger.Info("Reconciling plan", "plan", Plan)
+
 	return reconcile.Result{}, nil
 }
 

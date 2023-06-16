@@ -15,7 +15,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // Reconciler reconciles a Operation object.
@@ -25,9 +25,47 @@ type Reconciler struct {
 	Recorder record.Recorder
 }
 
+func (r *Reconciler) reconcileImport(ctx goctx.Context, operation *vmopv1.Operation) (ctrl.Result, error) {
+	return ctrl.Result{}, nil
+}
+
+func (r *Reconciler) reconcileExport(ctx goctx.Context, operation *vmopv1.Operation) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+	logger.Info("Reconciling export", "Operation", operation)
+	return ctrl.Result{}, nil
+}
+
+func (r *Reconciler) reconcileColdMigration(ctx goctx.Context, operation *vmopv1.Operation) (ctrl.Result, error) {
+	return ctrl.Result{}, nil
+}
+
+func (r *Reconciler) reconcileLiveMigration(ctx goctx.Context, operation *vmopv1.Operation) (ctrl.Result, error) {
+	return ctrl.Result{}, nil
+}
+
 func (r *Reconciler) Reconcile(ctx goctx.Context, req ctrl.Request) (_ ctrl.Result, reterr error) {
-	r.Logger.Info("Reconciling Operation")
-	return reconcile.Result{}, nil
+	logger := log.FromContext(ctx)
+	logger.Info("Reconciling Operation", "request", req)
+
+	Operation := &vmopv1.Operation{}
+	if err := r.Get(ctx, req.NamespacedName, Operation); err != nil {
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	logger.Info("Reconciling Operation", "Operation", Operation)
+
+	switch Operation.Spec.OperationType {
+	case vmopv1.Import:
+		return r.reconcileImport(ctx, Operation)
+	case vmopv1.Export:
+		return r.reconcileExport(ctx, Operation)
+	case vmopv1.ColdMigration:
+		return r.reconcileColdMigration(ctx, Operation)
+	case vmopv1.LiveMigration:
+		return r.reconcileLiveMigration(ctx, Operation)
+	default:
+		return ctrl.Result{}, nil
+	}
 }
 
 // AddToManager adds this package's controller to the provided manager.

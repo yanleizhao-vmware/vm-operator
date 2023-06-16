@@ -39,8 +39,8 @@ type OperationReference struct {
 
 // OperationSpec defines the desired state of Operation
 type OperationSpec struct {
-	OperationType OperationType  `json:"operationType"`
-	Entity        VirtualMachine `json:"entity"`
+	OperationType OperationType `json:"operationType"`
+	EntityName    string        `json:"entityName"`
 }
 
 // OperationStatus defines the observed state of Operation
