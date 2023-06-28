@@ -16,6 +16,9 @@ import (
 	"github.com/vmware-tanzu/vm-operator/pkg/vmprovider"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -84,6 +87,97 @@ func (r *Reconciler) exportVM(ctx goctx.Context, operation *vmopv1.Operation) er
 	// Delete the VM from the cluster.
 	if err := r.Delete(ctx, vm); err != nil {
 		logger.Error(err, "Failed to delete VM referenced by Operation", "Operation", operation)
+		return err
+	}
+
+	return nil
+}
+
+func (r *Reconciler) importVM(ctx goctx.Context, operation *vmopv1.Operation) error {
+	logger := log.FromContext(ctx)
+	logger.Info("Importing VM", "Operation", operation)
+
+	kubeconfigPath := "/etc/kubeconfig/config_target_cluster"
+
+	config, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+	if err != nil {
+		logger.Error(err, "Failed to build config from flags")
+		return err
+	}
+
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		logger.Error(err, "Failed to create dynamic client")
+		return err
+	}
+
+	gvrOperation := schema.GroupVersionResource{
+		Group:    "vmoperator.vmware.com",
+		Version:  "v1alpha1",
+		Resource: "operations", // use "plans" for the Plan resource
+	}
+
+	operationObj := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "vmoperator.vmware.com/v1alpha1",
+			"kind":       "Operation",
+			"metadata": map[string]interface{}{
+				"name":      "import",
+				"namespace": "mobility-service-1",
+			},
+			"spec": map[string]interface{}{
+				"operationType": "Import",
+				"entityName":    "centos-cloudinit-example",
+				"vmSpec": map[string]interface{}{
+					"networkInterfaces": []map[string]interface{}{
+						{
+							"networkName": "primary-2",
+							"networkType": "vsphere-distributed",
+						},
+					},
+					"className":  "best-effort-small",
+					"imageName":  "vmi-0992e8a6bf35e6e1f",
+					"powerState": "poweredOff",
+				},
+			},
+		},
+	}
+
+	_, err = dynamicClient.Resource(gvrOperation).Namespace("mobility-service-1").Create(ctx, operationObj, metav1.CreateOptions{})
+	if err != nil {
+		logger.Error(err, "Failed to create operation")
+		return err
+	}
+
+	gvrPlan := schema.GroupVersionResource{
+		Group:    "vmoperator.vmware.com",
+		Version:  "v1alpha1",
+		Resource: "plans", // use "plans" for the Plan resource
+	}
+
+	planObj := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "vmoperator.vmware.com/v1alpha1",
+			"kind":       "Plan",
+			"metadata": map[string]interface{}{
+				"name":      "importvm-plan",
+				"namespace": "mobility-service-1",
+			},
+			"spec": map[string]interface{}{
+				"operations": []map[string]interface{}{
+					{
+						"kind":      "Operation",
+						"namespace": "mobility-service-1",
+						"name":      "import",
+					},
+				},
+			},
+		},
+	}
+
+	_, err = dynamicClient.Resource(gvrPlan).Namespace("mobility-service-1").Create(ctx, planObj, metav1.CreateOptions{})
+	if err != nil {
+		logger.Error(err, "Failed to create plan")
 		return err
 	}
 
@@ -170,6 +264,10 @@ func (r *Reconciler) reconcileColdMigration(ctx goctx.Context, operation *vmopv1
 
 	if err := r.VMProvider.RelocateVirtualMachine(vmCtx, vmCtx.VM); err != nil {
 		logger.Error(err, "Failed to relocate VM referenced by Operation", "Operation", operation)
+		return ctrl.Result{}, err
+	}
+
+	if err := r.importVM(ctx, operation); err != nil {
 		return ctrl.Result{}, err
 	}
 
