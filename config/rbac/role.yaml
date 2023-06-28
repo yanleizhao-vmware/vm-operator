@@ -3,7 +3,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   creationTimestamp: null
-  name: vmware-system-vmop-manager-role
+  name: manager-role
 rules:
 - apiGroups:
   - ""
@@ -441,43 +441,3 @@ rules:
   - patch
   - update
   - watch
-- apiGroups:
-  - vmoperator.vmware.com
-  resources:
-  - operations
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - vmoperator.vmware.com
-  resources:
-  - operations/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - vmoperator.vmware.com
-  resources:
-  - plans
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - vmoperator.vmware.com
-  resources:
-  - plans/status
-  verbs:
-  - get
-  - patch
-  - update

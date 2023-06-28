@@ -325,7 +325,7 @@ func (r *Reconciler) ReconcileDelete(ctx *context.VirtualMachineContext) (reterr
 			r.Recorder.EmitEvent(ctx.VM, "Delete", reterr, false)
 		}()
 
-		// If VM is annotated with export annotation, do not delete the vm.
+		// If VM is annotated with export annotation, do not delete the vm from vSphere infrastructure.
 		if _, ok := ctx.VM.Annotations[vmopv1.ExportAnnotation]; ok {
 			ctx.Logger.Info("Skipping deletion of VM since Export annotation is set on the VM")
 		} else if err := r.VMProvider.DeleteVirtualMachine(ctx, ctx.VM); err != nil {

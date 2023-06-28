@@ -87,6 +87,13 @@ func (s *VMProvider) CreateOrUpdateVirtualMachine(ctx context.Context, vm *vmopv
 	return nil
 }
 
+func (s *VMProvider) RelocateVirtualMachine(ctx context.Context, vm *vmopv1.VirtualMachine) error {
+	s.Lock()
+	defer s.Unlock()
+	// TODO Implement this
+	return nil
+}
+
 func (s *VMProvider) DeleteVirtualMachine(ctx context.Context, vm *vmopv1.VirtualMachine) error {
 	s.Lock()
 	defer s.Unlock()

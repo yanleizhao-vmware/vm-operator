@@ -143,7 +143,7 @@ func resourcePolicyTests() {
 				rp, err := ctx.GetSingleClusterCompute().ResourcePool(ctx)
 				Expect(err).ToNot(HaveOccurred())
 
-				// Make trip through the Finder to populate InventoryPath.
+				// Make trip through the  to populate InventoryPath.
 				objRef, err := ctx.Finder.ObjectReference(ctx, rp.Reference())
 				Expect(err).ToNot(HaveOccurred())
 				rp, ok := objRef.(*object.ResourcePool)

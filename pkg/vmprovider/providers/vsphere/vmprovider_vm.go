@@ -86,6 +86,97 @@ func (vs *vSphereVMProvider) CreateOrUpdateVirtualMachine(
 	return vs.updateVirtualMachine(vmCtx, vcVM, client)
 }
 
+func GetNetworkFromVM(vmCtx *context.VirtualMachineContext, vm *object.VirtualMachine) (*types.VirtualVmxnet3, error) {
+	vdl, err := vm.Device(vmCtx)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to find devices of virtual machine")
+	}
+
+	for _, d := range vdl {
+		if nic, ok := d.(*types.VirtualVmxnet3); ok {
+			// Be happy with the first NIC for now.
+			return nic, nil
+		}
+	}
+
+	return nil, errors.New("VM doesn't have a network card")
+}
+
+func (vs *vSphereVMProvider) RelocateVirtualMachine(ctx goctx.Context, vm *vmopv1.VirtualMachine) error {
+	vmCtx := context.VirtualMachineContext{
+		Context: goctx.WithValue(ctx, types.ID{}, vs.getOpID(vm, "relocateVM")),
+		Logger:  log.WithValues("vmName", vm.NamespacedName()),
+		VM:      vm,
+	}
+
+	client, err := vs.getVcClient(vmCtx)
+	if err != nil {
+		return err
+	}
+
+	vcVM, err := vs.getVM(vmCtx, client, false)
+	if err != nil {
+		return err
+	} else if vcVM == nil {
+		// VM does not exist.
+		return nil
+	}
+	vmCtx.Logger.Info("Relocating VM", "vm", vcVM.Reference())
+
+	dstHost, err := client.Finder().HostSystem(vmCtx, "10.78.84.192")
+	if err != nil {
+		return err
+	}
+	dstHostMoRef := dstHost.Reference()
+	vmCtx.Logger.Info("Dst host", "host", dstHostMoRef)
+
+	dstPool, err := client.Finder().ResourcePool(vmCtx, "mobility-service-1")
+	if err != nil {
+		return err
+	}
+	dstPoolMoRef := dstPool.Reference()
+	vmCtx.Logger.Info("Dst resource pool", "rp", dstPoolMoRef)
+
+	dstDs, err := client.Finder().Datastore(vmCtx, "sharedVmfs-0 (1)")
+	if err != nil {
+		return err
+	}
+	dstDsMoRef := dstDs.Reference()
+	vmCtx.Logger.Info("Dst datastore", "ds", dstDsMoRef)
+
+	dstVmNetworkName := "primary-vds-2"
+	dstNetwork, err := client.Finder().Network(vmCtx, dstVmNetworkName)
+	if err != nil {
+		return err
+	}
+	dstNetworkMoRef := dstNetwork.Reference()
+	vmCtx.Logger.Info("Dst network", "network", dstNetworkMoRef)
+	srcVmNetwork, err := GetNetworkFromVM(&vmCtx, vcVM)
+	if err != nil {
+		return err
+	}
+	var deviceConfigSpecs []types.BaseVirtualDeviceConfigSpec
+	deviceConfigSpec := &types.VirtualDeviceConfigSpec{
+		Operation: types.VirtualDeviceConfigSpecOperationEdit,
+		Device:    srcVmNetwork,
+	}
+	deviceConfigSpec.Device.GetVirtualDevice().Backing = &types.VirtualEthernetCardNetworkBackingInfo{
+		VirtualDeviceDeviceBackingInfo: types.VirtualDeviceDeviceBackingInfo{
+			DeviceName: dstVmNetworkName,
+		},
+	}
+	deviceConfigSpecs = append(deviceConfigSpecs, deviceConfigSpec)
+
+	relocateSpec := types.VirtualMachineRelocateSpec{
+		Host:         &dstHostMoRef,
+		Pool:         &dstPoolMoRef,
+		Datastore:    &dstDsMoRef,
+		DeviceChange: deviceConfigSpecs,
+	}
+
+	return virtualmachine.RelocateVirtualMachine(vmCtx, vcVM, relocateSpec)
+}
+
 func (vs *vSphereVMProvider) DeleteVirtualMachine(
 	ctx goctx.Context,
 	vm *vmopv1.VirtualMachine) error {

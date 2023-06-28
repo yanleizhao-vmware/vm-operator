@@ -19,6 +19,7 @@ import (
 // VirtualMachineProviderInterface is a plugable interface for VM Providers.
 type VirtualMachineProviderInterface interface {
 	CreateOrUpdateVirtualMachine(ctx context.Context, vm *vmopv1.VirtualMachine) error
+	RelocateVirtualMachine(ctx context.Context, vm *vmopv1.VirtualMachine) error
 	DeleteVirtualMachine(ctx context.Context, vm *vmopv1.VirtualMachine) error
 	PublishVirtualMachine(ctx context.Context, vm *vmopv1.VirtualMachine,
 		vmPub *vmopv1.VirtualMachinePublishRequest, cl *imgregv1a1.ContentLibrary, actID string) (string, error)
