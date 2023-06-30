@@ -3,24 +3,24 @@ package operation
 import (
 	goctx "context"
 	"fmt"
-	"io/ioutil"
 	"reflect"
 	"strings"
 
 	"github.com/go-logr/logr"
-
 	vmopv1 "github.com/vmware-tanzu/vm-operator/api/v1alpha1"
 	"github.com/vmware-tanzu/vm-operator/pkg/context"
 	"github.com/vmware-tanzu/vm-operator/pkg/lib"
 	"github.com/vmware-tanzu/vm-operator/pkg/record"
 	"github.com/vmware-tanzu/vm-operator/pkg/vmprovider"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -93,19 +93,75 @@ func (r *Reconciler) exportVM(ctx goctx.Context, operation *vmopv1.Operation) er
 	return nil
 }
 
+func (r *Reconciler) createClientsFromConfig(ctx goctx.Context) (*kubernetes.Clientset, dynamic.Interface, error) {
+	logger := log.FromContext(ctx)
+	logger.Info("Creating dynamic client")
+
+	secret := &corev1.Secret{}
+	err := r.Get(ctx, client.ObjectKey{Name: "ms-1-secret", Namespace: "default"}, secret)
+	if err != nil {
+		logger.Error(err, "Failed to get secret")
+		return nil, nil, err
+	}
+
+	for k, v := range secret.Data {
+		logger.Info("secret data", "key", k, "value", string(v))
+	}
+
+	pemCert := string(secret.Data["ms-admin.crt"])
+	pemKey := string(secret.Data["ms-admin.key"])
+	server_ip := string(secret.Data["server-ip"])
+	server_port := string(secret.Data["server-port"])
+
+	clientConfig := clientcmdapi.Config{
+		Clusters: map[string]*clientcmdapi.Cluster{
+			"kubernetes": {
+				Server:                fmt.Sprintf("https://%s:%s", server_ip, server_port),
+				InsecureSkipTLSVerify: true,
+			},
+		},
+		Contexts: map[string]*clientcmdapi.Context{
+			"kubernetes-admin@kubernetes": {
+				Cluster:  "kubernetes",
+				AuthInfo: "kubernetes-admin",
+			},
+		},
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
+			"kubernetes-admin": {
+				ClientCertificateData: []byte(pemCert),
+				ClientKeyData:         []byte(pemKey),
+			},
+		},
+		CurrentContext: "kubernetes-admin@kubernetes",
+	}
+
+	clientConfigAccess := clientcmd.NewDefaultClientConfig(clientConfig, &clientcmd.ConfigOverrides{})
+	config, err := clientConfigAccess.ClientConfig()
+	if err != nil {
+		logger.Error(err, "Failed to create client config")
+		return nil, nil, err
+	}
+
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		logger.Error(err, "Failed to create dynamic client")
+		return nil, nil, err
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		logger.Error(err, "Failed to create clientset from config")
+		return nil, nil, err
+	}
+
+	return clientset, dynamicClient, nil
+}
+
 func (r *Reconciler) importVM(ctx goctx.Context, operation *vmopv1.Operation) error {
 	logger := log.FromContext(ctx)
 	logger.Info("Importing VM", "Operation", operation)
 
-	kubeconfigPath := "/etc/kubeconfig/config_target_cluster"
-
-	config, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
-	if err != nil {
-		logger.Error(err, "Failed to build config from flags")
-		return err
-	}
-
-	dynamicClient, err := dynamic.NewForConfig(config)
+	_, dynamicClient, err := r.createClientsFromConfig(ctx)
 	if err != nil {
 		logger.Error(err, "Failed to create dynamic client")
 		return err
@@ -195,34 +251,10 @@ func (r *Reconciler) reconcileExport(ctx goctx.Context, operation *vmopv1.Operat
 
 func (r *Reconciler) testTargetClusterConnection(ctx goctx.Context) error {
 	logger := log.FromContext(ctx)
-	kubeconfigPath := "/etc/kubeconfig/config_target_cluster"
 
-	data, err := ioutil.ReadFile(kubeconfigPath)
+	clientset, _, err := r.createClientsFromConfig(ctx)
 	if err != nil {
-		logger.Error(err, "Failed to read kubeconfig file")
-		return err
-	}
-
-	logger.Info("Content of the kubeconfig file", "content", string(data))
-
-	config, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
-	if err != nil {
-		logger.Error(err, "Failed to build config from flags")
-		return err
-	}
-
-	logger.Info("Config",
-		"host", config.Host,
-		"APIPath", config.APIPath,
-		"Username", config.Username,
-		"ServerName", config.TLSClientConfig.ServerName,
-		"IsInsecure", config.TLSClientConfig.Insecure,
-		"BearerTokenFile", config.BearerTokenFile,
-	)
-
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		logger.Error(err, "Failed to create clientset from config")
+		logger.Error(err, "Failed to create dynamic client")
 		return err
 	}
 
@@ -251,26 +283,26 @@ func (r *Reconciler) reconcileColdMigration(ctx goctx.Context, operation *vmopv1
 		logger.Error(err, "Failed to test target cluster connection")
 		return ctrl.Result{}, err
 	}
+	/*
+		if err := r.exportVM(ctx, operation); err != nil {
+			return ctrl.Result{}, err
+		}
 
-	if err := r.exportVM(ctx, operation); err != nil {
-		return ctrl.Result{}, err
-	}
+		vmCtx := &context.VirtualMachineContext{
+			Context: goctx.WithValue(ctx, context.MaxDeployThreadsContextKey, r.maxDeployThreads),
+			Logger:  ctrl.Log.WithName("VirtualMachine").WithValues("name", vm.NamespacedName()),
+			VM:      vm,
+		}
 
-	vmCtx := &context.VirtualMachineContext{
-		Context: goctx.WithValue(ctx, context.MaxDeployThreadsContextKey, r.maxDeployThreads),
-		Logger:  ctrl.Log.WithName("VirtualMachine").WithValues("name", vm.NamespacedName()),
-		VM:      vm,
-	}
+		if err := r.VMProvider.RelocateVirtualMachine(vmCtx, vmCtx.VM); err != nil {
+			logger.Error(err, "Failed to relocate VM referenced by Operation", "Operation", operation)
+			return ctrl.Result{}, err
+		}
 
-	if err := r.VMProvider.RelocateVirtualMachine(vmCtx, vmCtx.VM); err != nil {
-		logger.Error(err, "Failed to relocate VM referenced by Operation", "Operation", operation)
-		return ctrl.Result{}, err
-	}
-
-	if err := r.importVM(ctx, operation); err != nil {
-		return ctrl.Result{}, err
-	}
-
+		if err := r.importVM(ctx, operation); err != nil {
+			return ctrl.Result{}, err
+		}
+	*/
 	return ctrl.Result{}, nil
 }
 
