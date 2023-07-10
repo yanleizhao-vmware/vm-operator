@@ -35,6 +35,15 @@ spec:
           spec:
             description: OperationSpec defines the desired state of Operation
             properties:
+              destination:
+                properties:
+                  name:
+                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                    type: string
+                  namespace:
+                    description: 'Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/'
+                    type: string
+                type: object
               entityName:
                 type: string
               operationType:
@@ -435,7 +444,6 @@ spec:
             required:
             - entityName
             - operationType
-            - vmSpec
             type: object
           status:
             description: OperationStatus defines the observed state of Operation
