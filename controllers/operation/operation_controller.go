@@ -93,9 +93,21 @@ func (r *Reconciler) exportVM(ctx goctx.Context, operation *vmopv1.Operation) er
 	return nil
 }
 
-func (r *Reconciler) createClientsFromConfig(ctx goctx.Context) (*kubernetes.Clientset, dynamic.Interface, error) {
+func (r *Reconciler) createClientsFromConfig(ctx goctx.Context, operation *vmopv1.Operation) (*kubernetes.Clientset, dynamic.Interface, error) {
 	logger := log.FromContext(ctx)
 	logger.Info("Creating dynamic client")
+
+	destination := &vmopv1.SupervisorLocation{}
+	if err := r.Get(ctx, client.ObjectKey{Name: operation.Spec.Destination.Name, Namespace: operation.Spec.Destination.Namespace}, destination); err != nil {
+		logger.Error(err, "Failed to find SupervisorLocation referenced by Operation", "Operation", operation)
+		return nil, nil, err
+	}
+
+	destinationSecret := &corev1.Secret{}
+	if err := r.Get(ctx, client.ObjectKey{Name: destination.Spec.Identity.Name, Namespace: destination.Spec.Identity.Namespace}, destinationSecret); err != nil {
+		logger.Error(err, "Failed to find VM referenced by Operation", "Operation", operation)
+		return nil, nil, err
+	}
 
 	secret := &corev1.Secret{}
 	err := r.Get(ctx, client.ObjectKey{Name: "ms-1-secret", Namespace: "default"}, secret)
@@ -104,19 +116,17 @@ func (r *Reconciler) createClientsFromConfig(ctx goctx.Context) (*kubernetes.Cli
 		return nil, nil, err
 	}
 
-	for k, v := range secret.Data {
+	for k, v := range destinationSecret.Data {
 		logger.Info("secret data", "key", k, "value", string(v))
 	}
 
-	pemCert := string(secret.Data["ms-admin.crt"])
-	pemKey := string(secret.Data["ms-admin.key"])
-	server_ip := string(secret.Data["server-ip"])
-	server_port := string(secret.Data["server-port"])
+	pemCert := string(destinationSecret.Data["tls.crt"])
+	pemKey := string(destinationSecret.Data["tls.key"])
 
 	clientConfig := clientcmdapi.Config{
 		Clusters: map[string]*clientcmdapi.Cluster{
 			"kubernetes": {
-				Server:                fmt.Sprintf("https://%s:%s", server_ip, server_port),
+				Server:                fmt.Sprintf("https://%s:%d", destination.Spec.Host, destination.Spec.Port),
 				InsecureSkipTLSVerify: true,
 			},
 		},
@@ -161,7 +171,7 @@ func (r *Reconciler) importVM(ctx goctx.Context, operation *vmopv1.Operation) er
 	logger := log.FromContext(ctx)
 	logger.Info("Importing VM", "Operation", operation)
 
-	_, dynamicClient, err := r.createClientsFromConfig(ctx)
+	_, dynamicClient, err := r.createClientsFromConfig(ctx, operation)
 	if err != nil {
 		logger.Error(err, "Failed to create dynamic client")
 		return err
@@ -249,10 +259,10 @@ func (r *Reconciler) reconcileExport(ctx goctx.Context, operation *vmopv1.Operat
 	return ctrl.Result{}, nil
 }
 
-func (r *Reconciler) testTargetClusterConnection(ctx goctx.Context) error {
+func (r *Reconciler) testTargetClusterConnection(ctx goctx.Context, operation *vmopv1.Operation) error {
 	logger := log.FromContext(ctx)
 
-	clientset, _, err := r.createClientsFromConfig(ctx)
+	clientset, _, err := r.createClientsFromConfig(ctx, operation)
 	if err != nil {
 		logger.Error(err, "Failed to create dynamic client")
 		return err
@@ -279,7 +289,7 @@ func (r *Reconciler) reconcileColdMigration(ctx goctx.Context, operation *vmopv1
 		return ctrl.Result{}, err
 	}
 
-	if err := r.testTargetClusterConnection(ctx); err != nil {
+	if err := r.testTargetClusterConnection(ctx, operation); err != nil {
 		logger.Error(err, "Failed to test target cluster connection")
 		return ctrl.Result{}, err
 	}
