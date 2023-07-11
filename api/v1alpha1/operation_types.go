@@ -37,12 +37,20 @@ type OperationReference struct {
 	Name string `json:"name,omitempty"`
 }
 
+type RelocateSpec struct {
+	HostIp           string `json:"hostIp"`
+	ResourcePoolName string `json:"resourcePoolName"`
+	DatastoreName    string `json:"datastoreName"`
+	VmNetworkName    string `json:"vmNetworkName"`
+}
+
 // OperationSpec defines the desired state of Operation
 type OperationSpec struct {
 	OperationType OperationType               `json:"operationType"`
 	EntityName    string                      `json:"entityName"`
 	VmSpec        VirtualMachineSpec          `json:"vmSpec,omitempty"`
 	Destination   SupervisorLocationReference `json:"destination,omitempty"`
+	RelocateSpec  RelocateSpec                `json:"relocateSpec,omitempty"`
 }
 
 // OperationStatus defines the observed state of Operation

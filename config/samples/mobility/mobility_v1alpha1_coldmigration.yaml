@@ -40,6 +40,11 @@ spec:
   destination:
     namespace: mobility-service-0
     name: mobility-service-1-cluster
+  relocateSpec:
+    hostIp: "10.78.84.192"
+    resourcePoolName: "mobility-service-1"
+    datastoreName: "sharedVmfs-0 (1)"
+    vmNetworkName: "primary-vds-2"
 ---
 apiVersion: vmoperator.vmware.com/v1alpha1
 kind: Plan

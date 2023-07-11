@@ -48,6 +48,22 @@ spec:
                 type: string
               operationType:
                 type: string
+              relocateSpec:
+                properties:
+                  datastoreName:
+                    type: string
+                  hostIp:
+                    type: string
+                  resourcePoolName:
+                    type: string
+                  vmNetworkName:
+                    type: string
+                required:
+                - datastoreName
+                - hostIp
+                - resourcePoolName
+                - vmNetworkName
+                type: object
               vmSpec:
                 description: VirtualMachineSpec defines the desired state of a VirtualMachine.
                 properties:
