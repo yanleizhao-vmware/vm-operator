@@ -53,6 +53,9 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
+              namespace:
+                description: The namespace in which the API server is serving.
+                type: string
               port:
                 description: The port on which the API server is serving.
                 format: int32
@@ -60,6 +63,7 @@ spec:
             required:
             - host
             - identity
+            - namespace
             - port
             type: object
           status:

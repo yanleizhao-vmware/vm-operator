@@ -30,6 +30,9 @@ type SupervisorLocationSpec struct {
 
 	// The port on which the API server is serving.
 	Port int32 `json:"port"`
+
+	// The namespace in which the API server is serving.
+	Namespace string `json:"namespace"`
 }
 
 // SupervisorLocationStatus defines the observed state of SupervisorLocation

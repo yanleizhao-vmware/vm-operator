@@ -183,33 +183,42 @@ func (r *Reconciler) importVM(ctx goctx.Context, operation *vmopv1.Operation) er
 		Resource: "operations", // use "plans" for the Plan resource
 	}
 
+	destination := &vmopv1.SupervisorLocation{}
+	if err := r.Get(ctx, client.ObjectKey{Name: operation.Spec.Destination.Name, Namespace: operation.Spec.Destination.Namespace}, destination); err != nil {
+		logger.Error(err, "Failed to find SupervisorLocation referenced by Operation", "Operation", operation)
+		return err
+	}
+
+	destinationNamespace := destination.Spec.Namespace
+
 	operationObj := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "vmoperator.vmware.com/v1alpha1",
 			"kind":       "Operation",
 			"metadata": map[string]interface{}{
 				"name":      "import",
-				"namespace": "mobility-service-1",
+				"namespace": destinationNamespace,
 			},
 			"spec": map[string]interface{}{
 				"operationType": "Import",
-				"entityName":    "centos-cloudinit-example",
+				"entityName":    operation.Spec.EntityName,
 				"vmSpec": map[string]interface{}{
 					"networkInterfaces": []map[string]interface{}{
 						{
-							"networkName": "primary-2",
-							"networkType": "vsphere-distributed",
+							"networkName": operation.Spec.VmSpec.NetworkInterfaces[0].NetworkName,
+							"networkType": operation.Spec.VmSpec.NetworkInterfaces[0].NetworkType,
 						},
 					},
-					"className":  "best-effort-small",
-					"imageName":  "vmi-0992e8a6bf35e6e1f",
-					"powerState": "poweredOff",
+					"className":    operation.Spec.VmSpec.ClassName,
+					"imageName":    operation.Spec.VmSpec.ImageName,
+					"powerState":   operation.Spec.VmSpec.PowerState,
+					"storageClass": operation.Spec.VmSpec.StorageClass,
 				},
 			},
 		},
 	}
 
-	_, err = dynamicClient.Resource(gvrOperation).Namespace("mobility-service-1").Create(ctx, operationObj, metav1.CreateOptions{})
+	_, err = dynamicClient.Resource(gvrOperation).Namespace(destinationNamespace).Create(ctx, operationObj, metav1.CreateOptions{})
 	if err != nil {
 		logger.Error(err, "Failed to create operation")
 		return err
@@ -227,13 +236,13 @@ func (r *Reconciler) importVM(ctx goctx.Context, operation *vmopv1.Operation) er
 			"kind":       "Plan",
 			"metadata": map[string]interface{}{
 				"name":      "importvm-plan",
-				"namespace": "mobility-service-1",
+				"namespace": destinationNamespace,
 			},
 			"spec": map[string]interface{}{
 				"operations": []map[string]interface{}{
 					{
 						"kind":      "Operation",
-						"namespace": "mobility-service-1",
+						"namespace": destinationNamespace,
 						"name":      "import",
 					},
 				},
@@ -241,7 +250,7 @@ func (r *Reconciler) importVM(ctx goctx.Context, operation *vmopv1.Operation) er
 		},
 	}
 
-	_, err = dynamicClient.Resource(gvrPlan).Namespace("mobility-service-1").Create(ctx, planObj, metav1.CreateOptions{})
+	_, err = dynamicClient.Resource(gvrPlan).Namespace(destinationNamespace).Create(ctx, planObj, metav1.CreateOptions{})
 	if err != nil {
 		logger.Error(err, "Failed to create plan")
 		return err
