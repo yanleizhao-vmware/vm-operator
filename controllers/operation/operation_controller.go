@@ -293,26 +293,26 @@ func (r *Reconciler) reconcileColdMigration(ctx goctx.Context, operation *vmopv1
 		logger.Error(err, "Failed to test target cluster connection")
 		return ctrl.Result{}, err
 	}
-	/*
-		if err := r.exportVM(ctx, operation); err != nil {
-			return ctrl.Result{}, err
-		}
 
-		vmCtx := &context.VirtualMachineContext{
-			Context: goctx.WithValue(ctx, context.MaxDeployThreadsContextKey, r.maxDeployThreads),
-			Logger:  ctrl.Log.WithName("VirtualMachine").WithValues("name", vm.NamespacedName()),
-			VM:      vm,
-		}
+	if err := r.exportVM(ctx, operation); err != nil {
+		return ctrl.Result{}, err
+	}
 
-		if err := r.VMProvider.RelocateVirtualMachine(vmCtx, vmCtx.VM); err != nil {
-			logger.Error(err, "Failed to relocate VM referenced by Operation", "Operation", operation)
-			return ctrl.Result{}, err
-		}
+	vmCtx := &context.VirtualMachineContext{
+		Context: goctx.WithValue(ctx, context.MaxDeployThreadsContextKey, r.maxDeployThreads),
+		Logger:  ctrl.Log.WithName("VirtualMachine").WithValues("name", vm.NamespacedName()),
+		VM:      vm,
+	}
 
-		if err := r.importVM(ctx, operation); err != nil {
-			return ctrl.Result{}, err
-		}
-	*/
+	if err := r.VMProvider.RelocateVirtualMachine(vmCtx, vmCtx.VM); err != nil {
+		logger.Error(err, "Failed to relocate VM referenced by Operation", "Operation", operation)
+		return ctrl.Result{}, err
+	}
+
+	if err := r.importVM(ctx, operation); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	return ctrl.Result{}, nil
 }
 
