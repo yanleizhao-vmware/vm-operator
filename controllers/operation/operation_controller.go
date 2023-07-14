@@ -304,7 +304,7 @@ func (r *Reconciler) reconcileColdMigration(ctx goctx.Context, operation *vmopv1
 		VM:      vm,
 	}
 
-	if err := r.VMProvider.RelocateVirtualMachine(vmCtx, vmCtx.VM); err != nil {
+	if err := r.VMProvider.RelocateVirtualMachine(vmCtx, vmCtx.VM, &operation.Spec.RelocateSpec); err != nil {
 		logger.Error(err, "Failed to relocate VM referenced by Operation", "Operation", operation)
 		return ctrl.Result{}, err
 	}

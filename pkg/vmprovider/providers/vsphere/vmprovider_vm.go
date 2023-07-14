@@ -102,7 +102,7 @@ func GetNetworkFromVM(vmCtx *context.VirtualMachineContext, vm *object.VirtualMa
 	return nil, errors.New("VM doesn't have a network card")
 }
 
-func (vs *vSphereVMProvider) RelocateVirtualMachine(ctx goctx.Context, vm *vmopv1.VirtualMachine) error {
+func (vs *vSphereVMProvider) RelocateVirtualMachine(ctx goctx.Context, vm *vmopv1.VirtualMachine, supervisorRelocateSpec *vmopv1.RelocateSpec) error {
 	vmCtx := context.VirtualMachineContext{
 		Context: goctx.WithValue(ctx, types.ID{}, vs.getOpID(vm, "relocateVM")),
 		Logger:  log.WithValues("vmName", vm.NamespacedName()),
@@ -123,21 +123,21 @@ func (vs *vSphereVMProvider) RelocateVirtualMachine(ctx goctx.Context, vm *vmopv
 	}
 	vmCtx.Logger.Info("Relocating VM", "vm", vcVM.Reference())
 
-	dstHost, err := client.Finder().HostSystem(vmCtx, "10.78.84.192")
+	dstHost, err := client.Finder().HostSystem(vmCtx, supervisorRelocateSpec.HostIp)
 	if err != nil {
 		return err
 	}
 	dstHostMoRef := dstHost.Reference()
 	vmCtx.Logger.Info("Dst host", "host", dstHostMoRef)
 
-	dstPool, err := client.Finder().ResourcePool(vmCtx, "mobility-service-1")
+	dstPool, err := client.Finder().ResourcePool(vmCtx, supervisorRelocateSpec.ResourcePoolName)
 	if err != nil {
 		return err
 	}
 	dstPoolMoRef := dstPool.Reference()
 	vmCtx.Logger.Info("Dst resource pool", "rp", dstPoolMoRef)
 
-	dstDs, err := client.Finder().Datastore(vmCtx, "sharedVmfs-0 (1)")
+	dstDs, err := client.Finder().Datastore(vmCtx, supervisorRelocateSpec.DatastoreName)
 	if err != nil {
 		return err
 	}
@@ -145,7 +145,7 @@ func (vs *vSphereVMProvider) RelocateVirtualMachine(ctx goctx.Context, vm *vmopv
 	vmCtx.Logger.Info("Dst datastore", "ds", dstDsMoRef)
 
 	dstVmNetworkName := "primary-vds-2"
-	dstNetwork, err := client.Finder().Network(vmCtx, dstVmNetworkName)
+	dstNetwork, err := client.Finder().Network(vmCtx, supervisorRelocateSpec.VmNetworkName)
 	if err != nil {
 		return err
 	}

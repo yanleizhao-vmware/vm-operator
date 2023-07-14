@@ -87,7 +87,7 @@ func (s *VMProvider) CreateOrUpdateVirtualMachine(ctx context.Context, vm *vmopv
 	return nil
 }
 
-func (s *VMProvider) RelocateVirtualMachine(ctx context.Context, vm *vmopv1.VirtualMachine) error {
+func (s *VMProvider) RelocateVirtualMachine(ctx context.Context, vm *vmopv1.VirtualMachine, supervisorRelocateSpec *vmopv1.RelocateSpec) error {
 	s.Lock()
 	defer s.Unlock()
 	// TODO Implement this
