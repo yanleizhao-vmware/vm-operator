@@ -62,23 +62,27 @@ func (vs *vSphereVMProvider) CreateOrUpdateVirtualMachine(
 
 	client, err := vs.getVcClient(vmCtx)
 	if err != nil {
+		vmCtx.Logger.Error(err, "Failed to get VC client")
 		return err
 	}
 
 	vcVM, err := vs.getVM(vmCtx, client, false)
 	if err != nil {
+		vmCtx.Logger.Error(err, "Failed to get VM")
 		return err
 	}
 
 	if vcVM == nil {
 		vcVM, err = vs.createVirtualMachine(vmCtx, client)
 		if err != nil {
+			vmCtx.Logger.Error(err, "Failed to create VM")
 			return err
 		}
 
 		if vcVM == nil {
 			// Creation was not ready or blocked for some reason. We depend on the controller
 			// to eventually retry the create.
+			vmCtx.Logger.Info("VM creation not ready")
 			return nil
 		}
 	}
@@ -390,6 +394,7 @@ func (vs *vSphereVMProvider) updateVirtualMachine(
 
 		cluster, err := virtualmachine.GetVMClusterComputeResource(vmCtx, vcVM)
 		if err != nil {
+			vmCtx.Logger.Error(err, "GetVMClusterComputeResource failed")
 			return err
 		}
 
@@ -407,6 +412,7 @@ func (vs *vSphereVMProvider) updateVirtualMachine(
 
 		err = ses.UpdateVirtualMachine(vmCtx, vcVM, getUpdateArgsFn)
 		if err != nil {
+			vmCtx.Logger.Error(err, "UpdateVirtualMachine failed")
 			return err
 		}
 	}
