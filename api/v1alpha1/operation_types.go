@@ -42,6 +42,7 @@ type RelocateSpec struct {
 	ResourcePoolName string `json:"resourcePoolName"`
 	DatastoreName    string `json:"datastoreName"`
 	VmNetworkName    string `json:"vmNetworkName"`
+	FolderName       string `json:"folderName"`
 }
 
 // OperationSpec defines the desired state of Operation

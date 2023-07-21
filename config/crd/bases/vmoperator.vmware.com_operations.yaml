@@ -52,6 +52,8 @@ spec:
                 properties:
                   datastoreName:
                     type: string
+                  folderName:
+                    type: string
                   hostIp:
                     type: string
                   resourcePoolName:
@@ -60,6 +62,7 @@ spec:
                     type: string
                 required:
                 - datastoreName
+                - folderName
                 - hostIp
                 - resourcePoolName
                 - vmNetworkName

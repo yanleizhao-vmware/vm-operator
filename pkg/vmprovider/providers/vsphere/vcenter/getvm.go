@@ -25,6 +25,8 @@ func GetVirtualMachine(
 	datacenter *object.Datacenter,
 	finder *find.Finder) (*object.VirtualMachine, error) {
 
+	vmCtx.Logger.Info("Getting VM")
+
 	if uniqueID := vmCtx.VM.Status.UniqueID; uniqueID != "" {
 		if vm, err := findVMByMoID(vmCtx, finder, uniqueID); err == nil {
 			return vm, nil
@@ -92,6 +94,8 @@ func findVMByInventory(
 	vimClient *vim25.Client,
 	finder *find.Finder) (*object.VirtualMachine, error) {
 
+	vmCtx.Logger.Info("Finding VM via inventory")
+
 	// Note that we'll usually only get here to find the VM via its inventory path when we're first
 	// creating the VM. To determine the path, we need the NS Folder MoID and the VM's ResourcePolicy,
 	// if set, and we'll fetch these again as a part of createVirtualMachine(). For now, just re-fetch
@@ -132,6 +136,7 @@ func findVMByInventory(
 		}
 	}
 
+	vmCtx.Logger.Info("Finding VM via inventory", "folderPath", folder.InventoryPath, "vmName", vmCtx.VM.Name)
 	ref, err := object.NewSearchIndex(vimClient).FindChild(vmCtx, folder.Reference(), vmCtx.VM.Name)
 	if err != nil {
 		return nil, err

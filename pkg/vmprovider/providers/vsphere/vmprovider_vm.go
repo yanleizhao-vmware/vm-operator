@@ -60,6 +60,8 @@ func (vs *vSphereVMProvider) CreateOrUpdateVirtualMachine(
 		VM:      vm,
 	}
 
+	vmCtx.Logger.Info("CreateOrUpdateVirtualMachine", "vm", vm)
+
 	client, err := vs.getVcClient(vmCtx)
 	if err != nil {
 		vmCtx.Logger.Error(err, "Failed to get VC client")
@@ -71,6 +73,8 @@ func (vs *vSphereVMProvider) CreateOrUpdateVirtualMachine(
 		vmCtx.Logger.Error(err, "Failed to get VM")
 		return err
 	}
+
+	vmCtx.Logger.Info("vcVM", "vcVM", vcVM)
 
 	if vcVM == nil {
 		vcVM, err = vs.createVirtualMachine(vmCtx, client)
@@ -171,10 +175,18 @@ func (vs *vSphereVMProvider) RelocateVirtualMachine(ctx goctx.Context, vm *vmopv
 	}
 	deviceConfigSpecs = append(deviceConfigSpecs, deviceConfigSpec)
 
+	dstFolder, err := client.Finder().Folder(vmCtx, supervisorRelocateSpec.FolderName)
+	if err != nil {
+		return err
+	}
+	dstFolderMoRef := dstFolder.Reference()
+	vmCtx.Logger.Info("Dst folder", "folder", dstFolderMoRef)
+
 	relocateSpec := types.VirtualMachineRelocateSpec{
-		Host:         &dstHostMoRef,
-		Pool:         &dstPoolMoRef,
+		Folder:       &dstFolderMoRef,
 		Datastore:    &dstDsMoRef,
+		Pool:         &dstPoolMoRef,
+		Host:         &dstHostMoRef,
 		DeviceChange: deviceConfigSpecs,
 	}
 

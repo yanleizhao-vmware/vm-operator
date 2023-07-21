@@ -47,6 +47,7 @@ spec:
     resourcePoolName: "mobility-service-1"
     datastoreName: "sharedVmfs-0 (1)"
     vmNetworkName: "primary-vds-2"
+    folderName: "mobility-service-1"
 ---
 apiVersion: vmoperator.vmware.com/v1alpha1
 kind: Plan

@@ -2,6 +2,7 @@ package operation
 
 import (
 	goctx "context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -40,6 +41,9 @@ func (r *Reconciler) reconcileImport(ctx goctx.Context, operation *vmopv1.Operat
 	logger := log.FromContext(ctx)
 	logger.Info("Reconciling import", "Operation", operation)
 
+	// Log the operation.Spec.VmSpec.
+	logger.Info("VM Spec", "Spec", operation.Spec.VmSpec)
+
 	// Find the VM referenced by the Operation
 	vm := &vmopv1.VirtualMachine{}
 	if err := r.Get(ctx, client.ObjectKey{Name: operation.Spec.EntityName, Namespace: operation.Namespace}, vm); err != nil {
@@ -55,7 +59,7 @@ func (r *Reconciler) reconcileImport(ctx goctx.Context, operation *vmopv1.Operat
 			logger.Error(err, "Failed to create VM referenced by Operation", "Operation", operation)
 			return ctrl.Result{}, err
 		}
-		return ctrl.Result{}, err
+		return ctrl.Result{}, nil
 	}
 
 	// Exit since VM already exists.
@@ -217,6 +221,14 @@ func (r *Reconciler) importVM(ctx goctx.Context, operation *vmopv1.Operation) er
 			},
 		},
 	}
+
+	// Log the operationObj
+	operationObjBytes, err := json.MarshalIndent(operationObj, "", "  ")
+	if err != nil {
+		logger.Error(err, "Failed to marshal operationObj")
+		return err
+	}
+	logger.Info("operationObj", "operationObj", string(operationObjBytes))
 
 	_, err = dynamicClient.Resource(gvrOperation).Namespace(destinationNamespace).Create(ctx, operationObj, metav1.CreateOptions{})
 	if err != nil {
