@@ -53,6 +53,7 @@ func AddToManager(ctx *context.ControllerManagerContext, mgr manager.Manager) er
 	}
 	if err := plan.AddToManager(ctx, mgr); err != nil {
 		return errors.Wrap(err, "failed to initialize Plan controller")
+	}
 	if err := virtualmachinewebconsolerequest.AddToManager(ctx, mgr); err != nil {
 		return errors.Wrap(err, "failed to initialize VirtualMachineWebConsoleRequest controller")
 	}
