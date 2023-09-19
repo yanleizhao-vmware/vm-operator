@@ -6,7 +6,6 @@ package util_test
 import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
 	vimTypes "github.com/vmware/govmomi/vim25/types"
 
 	"github.com/vmware-tanzu/vm-operator/pkg/util"
@@ -83,20 +82,20 @@ var _ = Describe("SelectDevicesByType", func() {
 	})
 })
 
-var _ = Describe("IsDeviceVGPU", func() {
+var _ = Describe("IsDeviceNvidiaVgpu", func() {
 	Context("a VGPU", func() {
 		It("will return true", func() {
-			Expect(util.IsDeviceVGPU(newPCIPassthroughDevice("profile1"))).To(BeTrue())
+			Expect(util.IsDeviceNvidiaVgpu(newPCIPassthroughDevice("profile1"))).To(BeTrue())
 		})
 	})
 	Context("a dynamic direct path I/O device", func() {
 		It("will return false", func() {
-			Expect(util.IsDeviceVGPU(newPCIPassthroughDevice(""))).To(BeFalse())
+			Expect(util.IsDeviceNvidiaVgpu(newPCIPassthroughDevice(""))).To(BeFalse())
 		})
 	})
 	Context("a virtual CD-ROM", func() {
 		It("will return false", func() {
-			Expect(util.IsDeviceVGPU(&vimTypes.VirtualCdrom{})).To(BeFalse())
+			Expect(util.IsDeviceNvidiaVgpu(&vimTypes.VirtualCdrom{})).To(BeFalse())
 		})
 	})
 })
@@ -138,6 +137,29 @@ var _ = Describe("SelectDynamicDirectPathIO", func() {
 			Expect(devOut[0]).To(BeEquivalentTo(newPCIPassthroughDevice("")))
 			Expect(devOut[1].Backing).To(BeAssignableToTypeOf(&vimTypes.VirtualPCIPassthroughDynamicBackingInfo{}))
 			Expect(devOut[1]).To(BeEquivalentTo(newPCIPassthroughDevice("")))
+		})
+	})
+})
+
+var _ = Describe("SelectNvidiaVgpu", func() {
+	Context("selecting Nvidia vGPU devices", func() {
+		It("will return only the selected device type", func() {
+			devOut := util.SelectNvidiaVgpu(
+				[]vimTypes.BaseVirtualDevice{
+					newPCIPassthroughDevice(""),
+					&vimTypes.VirtualVmxnet3{},
+					newPCIPassthroughDevice("profile1"),
+					&vimTypes.VirtualSriovEthernetCard{},
+					newPCIPassthroughDevice(""),
+					newPCIPassthroughDevice("profile2"),
+				},
+			)
+			Expect(devOut).To(BeAssignableToTypeOf([]*vimTypes.VirtualPCIPassthrough{}))
+			Expect(devOut).To(HaveLen(2))
+			Expect(devOut[0].Backing).To(BeAssignableToTypeOf(&vimTypes.VirtualPCIPassthroughVmiopBackingInfo{}))
+			Expect(devOut[0]).To(BeEquivalentTo(newPCIPassthroughDevice("profile1")))
+			Expect(devOut[1].Backing).To(BeAssignableToTypeOf(&vimTypes.VirtualPCIPassthroughVmiopBackingInfo{}))
+			Expect(devOut[1]).To(BeEquivalentTo(newPCIPassthroughDevice("profile2")))
 		})
 	})
 })

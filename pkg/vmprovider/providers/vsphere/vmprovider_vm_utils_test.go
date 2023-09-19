@@ -14,7 +14,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	imgregv1a1 "github.com/vmware-tanzu/vm-operator/external/image-registry/api/v1alpha1"
+	"github.com/vmware/govmomi/vim25/types"
+
+	imgregv1a1 "github.com/vmware-tanzu/image-registry-operator-api/api/v1alpha1"
 
 	vmopv1 "github.com/vmware-tanzu/vm-operator/api/v1alpha1"
 	"github.com/vmware-tanzu/vm-operator/pkg/conditions"
@@ -22,7 +24,6 @@ import (
 	"github.com/vmware-tanzu/vm-operator/pkg/lib"
 	"github.com/vmware-tanzu/vm-operator/pkg/vmprovider/providers/vsphere"
 	"github.com/vmware-tanzu/vm-operator/pkg/vmprovider/providers/vsphere/instancestorage"
-	"github.com/vmware-tanzu/vm-operator/pkg/vmprovider/providers/vsphere/session"
 	"github.com/vmware-tanzu/vm-operator/test/builder"
 )
 
@@ -207,7 +208,7 @@ func vmUtilTests() {
 
 	})
 
-	Context("GetVMImageStatusAndContentLibraryUUID", func() {
+	Context("GetVMImageAndContentLibraryUUID", func() {
 
 		When("WCPVMImageRegistry FSS is disabled", func() {
 
@@ -241,7 +242,7 @@ func vmUtilTests() {
 				It("returns error and sets condition", func() {
 					expectedErrMsg := fmt.Sprintf("Failed to get VirtualMachineImage: %s", vmCtx.VM.Spec.ImageName)
 
-					_, _, err := vsphere.GetVMImageStatusAndContentLibraryUUID(vmCtx, k8sClient)
+					_, _, _, err := vsphere.GetVMImageAndContentLibraryUUID(vmCtx, k8sClient)
 					Expect(err).To(HaveOccurred())
 					Expect(err.Error()).To(ContainSubstring(expectedErrMsg))
 
@@ -264,7 +265,7 @@ func vmUtilTests() {
 				It("returns error and sets condition", func() {
 					expectedErrMsg := fmt.Sprintf("Failed to get ContentLibraryProvider: %s", clProvider.Name)
 
-					_, _, err := vsphere.GetVMImageStatusAndContentLibraryUUID(vmCtx, k8sClient)
+					_, _, _, err := vsphere.GetVMImageAndContentLibraryUUID(vmCtx, k8sClient)
 					Expect(err).To(HaveOccurred())
 					Expect(err.Error()).To(ContainSubstring(expectedErrMsg))
 
@@ -304,7 +305,7 @@ func vmUtilTests() {
 						expectedErrMsg := fmt.Sprintf("Namespace %s does not have access to ContentSource %s for VirtualMachineImage %s",
 							vmCtx.VM.Namespace, clProvider.Spec.UUID, vmCtx.VM.Spec.ImageName)
 
-						_, _, err := vsphere.GetVMImageStatusAndContentLibraryUUID(vmCtx, k8sClient)
+						_, _, _, err := vsphere.GetVMImageAndContentLibraryUUID(vmCtx, k8sClient)
 						Expect(err).To(HaveOccurred())
 						Expect(err.Error()).To(ContainSubstring(expectedErrMsg))
 
@@ -322,7 +323,7 @@ func vmUtilTests() {
 						expectedErrMsg := fmt.Sprintf("Namespace %s does not have access to ContentSource %s for VirtualMachineImage %s",
 							vmCtx.VM.Namespace, clProvider.Spec.UUID, vmCtx.VM.Spec.ImageName)
 
-						_, _, err := vsphere.GetVMImageStatusAndContentLibraryUUID(vmCtx, k8sClient)
+						_, _, _, err := vsphere.GetVMImageAndContentLibraryUUID(vmCtx, k8sClient)
 						Expect(err).To(HaveOccurred())
 						Expect(err.Error()).To(ContainSubstring(expectedErrMsg))
 
@@ -336,7 +337,7 @@ func vmUtilTests() {
 					})
 
 					It("returns success", func() {
-						image, uuid, err := vsphere.GetVMImageStatusAndContentLibraryUUID(vmCtx, k8sClient)
+						_, image, uuid, err := vsphere.GetVMImageAndContentLibraryUUID(vmCtx, k8sClient)
 						Expect(err).ToNot(HaveOccurred())
 						Expect(image).ToNot(BeNil())
 						Expect(uuid).ToNot(BeEmpty())
@@ -378,7 +379,7 @@ func vmUtilTests() {
 			When("Neither cluster or namespace scoped VM image exists", func() {
 
 				It("returns error and sets condition", func() {
-					_, _, err := vsphere.GetVMImageStatusAndContentLibraryUUID(vmCtx, k8sClient)
+					_, _, _, err := vsphere.GetVMImageAndContentLibraryUUID(vmCtx, k8sClient)
 					Expect(err).To(HaveOccurred())
 					expectedErrMsg := fmt.Sprintf("Failed to get the VM's image: %s", vmCtx.VM.Spec.ImageName)
 					Expect(err.Error()).To(ContainSubstring(expectedErrMsg))
@@ -406,7 +407,7 @@ func vmUtilTests() {
 				})
 
 				It("returns error and sets VM condition", func() {
-					_, _, err := vsphere.GetVMImageStatusAndContentLibraryUUID(vmCtx, k8sClient)
+					_, _, _, err := vsphere.GetVMImageAndContentLibraryUUID(vmCtx, k8sClient)
 					Expect(err).To(HaveOccurred())
 					expectedErrMsg := fmt.Sprintf("VM's image provider is not ready: %s", vmCtx.VM.Spec.ImageName)
 					Expect(err.Error()).To(ContainSubstring(expectedErrMsg))
@@ -434,7 +435,7 @@ func vmUtilTests() {
 				})
 
 				It("returns error and sets VM condition", func() {
-					_, _, err := vsphere.GetVMImageStatusAndContentLibraryUUID(vmCtx, k8sClient)
+					_, _, _, err := vsphere.GetVMImageAndContentLibraryUUID(vmCtx, k8sClient)
 					Expect(err).To(HaveOccurred())
 					expectedErrMsg := fmt.Sprintf("VM's image provider is not security compliant: %s", vmCtx.VM.Spec.ImageName)
 					Expect(err.Error()).To(ContainSubstring(expectedErrMsg))
@@ -464,7 +465,7 @@ func vmUtilTests() {
 				})
 
 				It("returns error and sets VM condition", func() {
-					_, _, err := vsphere.GetVMImageStatusAndContentLibraryUUID(vmCtx, k8sClient)
+					_, _, _, err := vsphere.GetVMImageAndContentLibraryUUID(vmCtx, k8sClient)
 					Expect(err).To(HaveOccurred())
 					expectedErrMsg := fmt.Sprintf("VM's image content version is not synced: %s", vmCtx.VM.Spec.ImageName)
 					Expect(err.Error()).To(ContainSubstring(expectedErrMsg))
@@ -490,7 +491,7 @@ func vmUtilTests() {
 				})
 
 				It("returns success", func() {
-					imageStatus, uuid, err := vsphere.GetVMImageStatusAndContentLibraryUUID(vmCtx, k8sClient)
+					_, imageStatus, uuid, err := vsphere.GetVMImageAndContentLibraryUUID(vmCtx, k8sClient)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(imageStatus).ToNot(BeNil())
 					Expect(uuid).To(Equal(string(cl.Spec.UUID)))
@@ -507,7 +508,7 @@ func vmUtilTests() {
 				})
 
 				It("returns success", func() {
-					imageStatus, uuid, err := vsphere.GetVMImageStatusAndContentLibraryUUID(vmCtx, k8sClient)
+					_, imageStatus, uuid, err := vsphere.GetVMImageAndContentLibraryUUID(vmCtx, k8sClient)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(imageStatus).ToNot(BeNil())
 					Expect(uuid).To(Equal(string(clusterCL.Spec.UUID)))
@@ -561,18 +562,32 @@ func vmUtilTests() {
 			})
 		})
 
+		When("neither ConfigMap nor Secret is specified", func() {
+			BeforeEach(func() {
+				vmCtx.VM.Spec.VmMetadata = &vmopv1.VirtualMachineMetadata{
+					Transport: vmopv1.VirtualMachineMetadataCloudInitTransport,
+				}
+			})
+			It("returns metadata transport", func() {
+				md, err := vsphere.GetVMMetadata(vmCtx, k8sClient)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(md.Transport).To(Equal(vmopv1.VirtualMachineMetadataCloudInitTransport))
+			})
+		})
+
 		When("VM Metadata is specified via a ConfigMap", func() {
 			BeforeEach(func() {
 				vmCtx.VM.Spec.VmMetadata = &vmopv1.VirtualMachineMetadata{
 					ConfigMapName: vmMetaDataConfigMap.Name,
-					Transport:     "transport",
+					Transport:     vmopv1.VirtualMachineMetadataCloudInitTransport,
 				}
 			})
 
 			It("return an error when ConfigMap does not exist", func() {
 				md, err := vsphere.GetVMMetadata(vmCtx, k8sClient)
 				Expect(err).To(HaveOccurred())
-				Expect(md).To(Equal(session.VMMetadata{}))
+				Expect(md.Data).To(BeEmpty())
+				Expect(md.Transport).To(Equal(vmopv1.VirtualMachineMetadataCloudInitTransport))
 			})
 
 			When("ConfigMap exists", func() {
@@ -584,6 +599,7 @@ func vmUtilTests() {
 					md, err := vsphere.GetVMMetadata(vmCtx, k8sClient)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(md.Data).To(Equal(vmMetaDataConfigMap.Data))
+					Expect(md.Transport).To(Equal(vmopv1.VirtualMachineMetadataCloudInitTransport))
 				})
 			})
 		})
@@ -592,14 +608,15 @@ func vmUtilTests() {
 			BeforeEach(func() {
 				vmCtx.VM.Spec.VmMetadata = &vmopv1.VirtualMachineMetadata{
 					SecretName: vmMetaDataSecret.Name,
-					Transport:  "transport",
+					Transport:  vmopv1.VirtualMachineMetadataCloudInitTransport,
 				}
 			})
 
 			It("returns an error when Secret does not exist", func() {
 				md, err := vsphere.GetVMMetadata(vmCtx, k8sClient)
 				Expect(err).To(HaveOccurred())
-				Expect(md).To(Equal(session.VMMetadata{}))
+				Expect(md.Data).To(BeEmpty())
+				Expect(md.Transport).To(Equal(vmopv1.VirtualMachineMetadataCloudInitTransport))
 			})
 
 			When("Secret exists", func() {
@@ -611,6 +628,7 @@ func vmUtilTests() {
 					md, err := vsphere.GetVMMetadata(vmCtx, k8sClient)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(md.Data).ToNot(BeEmpty())
+					Expect(md.Transport).To(Equal(vmopv1.VirtualMachineMetadataCloudInitTransport))
 				})
 			})
 		})
@@ -750,6 +768,99 @@ func vmUtilTests() {
 					Expect(isVolumesAfter).To(Equal(isVolumesBefore))
 				})
 			})
+		})
+	})
+
+	Context("hasPVC", func() {
+		var spec vmopv1.VirtualMachineSpec
+		Context("Spec has no PVC", func() {
+			It("will return false", func() {
+				spec = vmopv1.VirtualMachineSpec{}
+				Expect(vsphere.HasPVC(spec)).To(BeFalse())
+			})
+		})
+		Context("Spec has PVCs", func() {
+			It("will return true", func() {
+				spec = vmopv1.VirtualMachineSpec{
+					Volumes: []vmopv1.VirtualMachineVolume{
+						{
+							Name: "dummy-vol",
+							PersistentVolumeClaim: &vmopv1.PersistentVolumeClaimVolumeSource{
+								PersistentVolumeClaimVolumeSource: corev1.PersistentVolumeClaimVolumeSource{
+									ClaimName: "pvc-claim-1",
+								},
+							},
+						},
+					},
+				}
+				Expect(vsphere.HasPVC(spec)).To(BeTrue())
+			})
+		})
+	})
+
+	Context("HardwareVersionForPVCandPCIDevices", func() {
+		var (
+			configSpec     *types.VirtualMachineConfigSpec
+			imageHWVersion int32
+		)
+
+		BeforeEach(func() {
+			imageHWVersion = 14
+			configSpec = &types.VirtualMachineConfigSpec{
+				Name: "dummy-VM",
+				DeviceChange: []types.BaseVirtualDeviceConfigSpec{
+					&types.VirtualDeviceConfigSpec{
+						Operation: types.VirtualDeviceConfigSpecOperationAdd,
+						Device: &types.VirtualPCIPassthrough{
+							VirtualDevice: types.VirtualDevice{
+								Backing: &types.VirtualPCIPassthroughVmiopBackingInfo{
+									Vgpu: "profile-from-configspec",
+								},
+							},
+						},
+					},
+					&types.VirtualDeviceConfigSpec{
+						Operation: types.VirtualDeviceConfigSpecOperationAdd,
+						Device: &types.VirtualPCIPassthrough{
+							VirtualDevice: types.VirtualDevice{
+								Backing: &types.VirtualPCIPassthroughDynamicBackingInfo{
+									AllowedDevice: []types.VirtualPCIPassthroughAllowedDevice{
+										{
+											VendorId: 52,
+											DeviceId: 53,
+										},
+									},
+									CustomLabel: "label-from-configspec",
+								},
+							},
+						},
+					},
+				},
+			}
+		})
+
+		It("ConfigSpec has PCI devices and VM spec has PVCs", func() {
+			Expect(vsphere.HardwareVersionForPVCandPCIDevices(imageHWVersion, configSpec, true)).To(Equal(int32(17)))
+		})
+
+		It("ConfigSpec has PCI devices and VM spec has no PVCs", func() {
+			Expect(vsphere.HardwareVersionForPVCandPCIDevices(imageHWVersion, configSpec, false)).To(Equal(int32(17)))
+		})
+
+		It("ConfigSpec has PCI devices, VM spec has PVCs image hardware version is higher than min supported HW version for PCI devices", func() {
+			imageHWVersion = 18
+			Expect(vsphere.HardwareVersionForPVCandPCIDevices(imageHWVersion, configSpec, true)).To(Equal(int32(18)))
+		})
+
+		It("VM spec has PVCs and config spec has no devices", func() {
+			configSpec = &types.VirtualMachineConfigSpec{}
+			Expect(vsphere.HardwareVersionForPVCandPCIDevices(imageHWVersion, configSpec, true)).To(Equal(int32(15)))
+		})
+
+		It("VM spec has PVCs, config spec has no devices and image hardware version is higher than min supported PVC HW version", func() {
+			configSpec = &types.VirtualMachineConfigSpec{}
+			imageHWVersion = 16
+			Expect(vsphere.HardwareVersionForPVCandPCIDevices(imageHWVersion, configSpec, true)).To(Equal(int32(16)))
 		})
 	})
 }

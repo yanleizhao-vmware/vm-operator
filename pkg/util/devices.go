@@ -116,8 +116,8 @@ func SelectVirtualPCIPassthrough(
 	return SelectDevicesByType[*vimTypes.VirtualPCIPassthrough](devices)
 }
 
-// IsDeviceVGPU returns true if the provided device is a vGPU.
-func IsDeviceVGPU(dev vimTypes.BaseVirtualDevice) bool {
+// IsDeviceNvidiaVgpu returns true if the provided device is an Nvidia vGPU.
+func IsDeviceNvidiaVgpu(dev vimTypes.BaseVirtualDevice) bool {
 	if dev, ok := dev.(*vimTypes.VirtualPCIPassthrough); ok {
 		_, ok := dev.Backing.(*vimTypes.VirtualPCIPassthroughVmiopBackingInfo)
 		return ok
@@ -133,6 +133,24 @@ func IsDeviceDynamicDirectPathIO(dev vimTypes.BaseVirtualDevice) bool {
 		return ok
 	}
 	return false
+}
+
+// SelectNvidiaVgpu return a slice of Nvidia vGPU devices.
+func SelectNvidiaVgpu(
+	devices []vimTypes.BaseVirtualDevice,
+) []*vimTypes.VirtualPCIPassthrough {
+	return selectVirtualPCIPassthroughWithVmiopBacking(devices)
+}
+
+// SelectVirtualPCIPassthroughWithVmiopBacking returns a slice of PCI devices with VmiopBacking.
+func selectVirtualPCIPassthroughWithVmiopBacking(
+	devices []vimTypes.BaseVirtualDevice,
+) []*vimTypes.VirtualPCIPassthrough {
+
+	return SelectDevicesByDeviceAndBackingType[
+		*vimTypes.VirtualPCIPassthrough,
+		*vimTypes.VirtualPCIPassthroughVmiopBackingInfo,
+	](devices)
 }
 
 // SelectDynamicDirectPathIO returns a slice of dynamic direct path I/O devices.
@@ -162,4 +180,14 @@ func isDiskOrDiskController(dev vimTypes.BaseVirtualDevice) bool {
 	default:
 		return false
 	}
+}
+
+// isNonRDMDisk returns true for all virtual disk devices excluding disks with a raw device mapping backing.
+func isNonRDMDisk(dev vimTypes.BaseVirtualDevice) bool {
+	if dev, ok := dev.(*vimTypes.VirtualDisk); ok {
+		_, hasRDMBacking := dev.Backing.(*vimTypes.VirtualDiskRawDiskMappingVer1BackingInfo)
+		return !hasRDMBacking
+	}
+
+	return false
 }

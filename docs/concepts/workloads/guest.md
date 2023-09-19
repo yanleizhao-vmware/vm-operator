@@ -113,6 +113,10 @@ The data in the above `Secret` is called the Cloud-Init _Cloud Config_. For more
 
 Microsoft originally designed Sysprep as a means to prepare a deployed system for use as a template. It was such a useful tool, that VMware utilized it as the means to customize a VM with a Windows guest.
 
+!!! note "Sysprep State"
+
+    Deploying Windows images that have not completed their previous Sysprep operation could cause the Guest OS customization to fail. Therefore, it is important to ensure that the image is sealed correctly and in a clean state when using Sysprep. For more information on this issue, please refer to [this article](https://kb.vmware.com/s/article/86350).
+
 #### Minimal Config
 
 The following YAML may be used to bootstrap a Windows image with minimal information. For proper network configuration and Guest OS Customization (GOSC) completion, Sysprep unattend data requires a template for providing network info and `RunSynchronousCommand` to record GOSC status. Both components are essential for Windows Vista and later versions.
@@ -342,19 +346,23 @@ To illustrate, the following YAML can be utilized to deploy a VirtualMachine and
       management_gateway: "{{ (index .V1alpha1.Net.Devices 0).Gateway4 }}"
     ```
 
-#### Supporting Template Functions
+=== "vAppConfig with supporting template"
 
-| Function Name               | Signature                                 | Description                                                                                                                                                                                                                                         |
-|-----------------------------|-------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| V1alpha1_FirstIP            | `func () string`                          | Get the first non-loopback IP with CIDR from first NIC.                                                                                                                                                                                              |
-| V1alpha1_FirstIPFromNIC     | `func (index int) string`                 | Get non-loopback IP address with CIDR from the ith NIC. If index is out of bound, template string won't be parsed.                                                                                                                                    |
-| V1alpha1_FormatIP           | `func (IP string, netmask string) string` | 1. Format an IP address with network length. A netmask can be either the length, ex. /24, or the decimal notation, ex. 255.255.255.0. 2. Format an IP address with CIDR: if input netmask is empty string, return IP sans CIDR. If input netmask is not valid, return empty string. If input netmask is different with CIDR, replace and return IP with new CIDR. |
-| V1alpha1_FormatNameservers  | `func (count int, delimiter string) string` | Format the first occurred count of nameservers with specific delimiter. A negative number for count would mean all nameservers.                                                                                                                       |
-| V1alpha1_IP                 | `func(IP string) string`                   | Format a static IP address with default netmask CIDR. If IP is not valid, template string won't be parsed.                                                                                                                                           |
-| V1alpha1_IPsFromNIC         | `func (index int) []string`               | List all IPs with CIDR from the ith NIC. If index is out of bound, template string won't be parsed.                                                                                                                                                  |
-| V1alpha1_SubnetMask         | `func(cidr string) (string, error)`        | Get subnet mask from a CIDR notation IP address and prefix length. If IP address and prefix length are not valid, throw an error and template string won't be parsed.                                                                                  |
-| V1alpha1_FirstNicMacAddr   | `func() (string, error)`                  | Get the first NIC's MAC address.                                                                                                                                                                                                                    |
+    ```yaml
+    apiVersion: v1
+    kind: Secret
+    metadata:
+    name: my-secret
+    namespace: test-ns
+    stringData:
+    # see more details on below Supporting Template Queries section
+    nameservers: "{{ V1alpha1_FormatNameservers 2 \",\" }}"
+    management_ip: "{{ V1alpha1_FormatIP \"192.168.1.10\" \"255.255.255.0\" }}"
+    hostname: "{{ .V1alpha1.VM.Name }} "  
+    management_gateway: "{{ (index .V1alpha1.Net.Devices 0).Gateway4 }}"
+    ```
 
+For more information on vAppConfig, please refer to [tutorial/deploy-vm/vappconfig](https://vm-operator.readthedocs.io/en/stable/tutorials/deploy-vm/vappconfig/).
 ## Deprecated
 
 The following bootstrap providers are still available, but they are deprecated and are not recommended.

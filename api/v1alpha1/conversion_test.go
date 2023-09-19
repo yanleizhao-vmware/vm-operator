@@ -15,6 +15,7 @@ import (
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 
 	"github.com/vmware-tanzu/vm-operator/api/utilconversion"
+
 	"github.com/vmware-tanzu/vm-operator/api/v1alpha1"
 	nextver "github.com/vmware-tanzu/vm-operator/api/v1alpha2"
 )
@@ -48,6 +49,15 @@ func TestFuzzyConversion(t *testing.T) {
 		Scheme: scheme,
 		Hub:    &nextver.VirtualMachineImage{},
 		Spoke:  &v1alpha1.VirtualMachineImage{},
+		FuzzerFuncs: []fuzzer.FuzzerFuncs{
+			overrideVirtualMachineImageFieldsFuncs,
+		},
+	}))
+
+	t.Run("for ClusterVirtualMachineImage", utilconversion.FuzzTestFunc(utilconversion.FuzzTestFuncInput{
+		Scheme: scheme,
+		Hub:    &nextver.ClusterVirtualMachineImage{},
+		Spoke:  &v1alpha1.ClusterVirtualMachineImage{},
 		FuzzerFuncs: []fuzzer.FuzzerFuncs{
 			overrideVirtualMachineImageFieldsFuncs,
 		},
@@ -124,7 +134,7 @@ func overrideVirtualMachineFieldsFuncs(codecs runtimeserializer.CodecFactory) []
 			vmStatus.NetworkInterfaces = nil
 
 			// Do not exist in v1a2.
-			vmStatus.Phase = ""
+			vmStatus.Phase = v1alpha1.Unknown
 		},
 		func(vmStatus *nextver.VirtualMachineStatus, c fuzz.Continue) {
 			c.Fuzz(vmStatus)
@@ -139,13 +149,19 @@ func overrideVirtualMachineFieldsFuncs(codecs runtimeserializer.CodecFactory) []
 
 func overrideVirtualMachineClassFieldsFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
-		func(classStatus *nextver.VirtualMachineClassStatus, c fuzz.Continue) {
-			c.Fuzz(classStatus)
+		func(classSpec *nextver.VirtualMachineClassSpec, c fuzz.Continue) {
+			c.Fuzz(classSpec)
 
-			// TODO: Need to save serialized object to support lossless conversions.
-			classStatus.Capabilities = nil
-			classStatus.Conditions = nil
-			classStatus.Ready = false
+			// Since all random byte arrays are not valid JSON
+			// Passing an empty string as a valid input
+			classSpec.ConfigSpec = []byte("")
+		},
+		func(classSpec *v1alpha1.VirtualMachineClassSpec, c fuzz.Continue) {
+			c.Fuzz(classSpec)
+
+			// Since all random byte arrays are not valid JSON
+			// Passing an empty string as a valid input
+			classSpec.ConfigSpec = []byte("")
 		},
 	}
 }
@@ -172,7 +188,6 @@ func overrideVirtualMachineImageFieldsFuncs(codecs runtimeserializer.CodecFactor
 			// Do not exist in v1a2.
 			imageSpec.Type = ""
 			imageSpec.ImageSourceType = ""
-			imageSpec.ImageID = ""
 			imageSpec.ProviderRef.Namespace = ""
 		},
 		func(imageStatus *v1alpha1.VirtualMachineImageStatus, c fuzz.Continue) {

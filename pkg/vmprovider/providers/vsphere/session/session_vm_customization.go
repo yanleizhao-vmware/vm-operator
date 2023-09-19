@@ -105,6 +105,12 @@ func GetCloudInitMetadata(vm *vmopv1.VirtualMachine,
 		Network:       netplan,
 		PublicKeys:    data["ssh-public-keys"],
 	}
+	// This is to address a bug when Cloud-Init sans configMap/secret actually got
+	// customized by LinuxPrep. Use annotation as instanceID to avoid
+	// different instanceID triggers CloudInit in brownfield scenario.
+	if value, ok := vm.Annotations[vmopv1.InstanceIDAnnotation]; ok {
+		metadataObj.InstanceID = value
+	}
 
 	metadataBytes, err := yaml.Marshal(metadataObj)
 	if err != nil {
@@ -151,7 +157,7 @@ func GetCloudInitGuestInfoCustSpec(
 
 	extraConfig := map[string]string{}
 
-	encodedMetadata, err := EncodeGzipBase64(cloudInitMetadata)
+	encodedMetadata, err := util.EncodeGzipBase64(cloudInitMetadata)
 	if err != nil {
 		return nil, fmt.Errorf("encoding cloud-init metadata failed %v", err)
 	}
@@ -176,7 +182,7 @@ func GetCloudInitGuestInfoCustSpec(
 			return nil, fmt.Errorf("decoding cloud-init userdata failed %v", err)
 		}
 
-		encodedUserdata, err := EncodeGzipBase64(plainText)
+		encodedUserdata, err := util.EncodeGzipBase64(plainText)
 		if err != nil {
 			return nil, fmt.Errorf("encoding cloud-init userdata failed %v", err)
 		}
@@ -273,8 +279,6 @@ func (s *Session) customize(
 	config *vimTypes.VirtualMachineConfigInfo,
 	updateArgs VMUpdateArgs) error {
 
-	TemplateVMMetadata(vmCtx, resVM, updateArgs)
-
 	transport := updateArgs.VMMetadata.Transport
 
 	var configSpec *vimTypes.VirtualMachineConfigSpec
@@ -288,6 +292,7 @@ func (s *Session) customize(
 		configSpec = GetOvfEnvCustSpec(config, updateArgs)
 		custSpec = GetLinuxPrepCustSpec(vmCtx.VM.Name, updateArgs)
 	case vmopv1.VirtualMachineMetadataVAppConfigTransport:
+		TemplateVMMetadata(vmCtx, resVM, updateArgs)
 		configSpec = GetOvfEnvCustSpec(config, updateArgs)
 	case vmopv1.VirtualMachineMetadataExtraConfigTransport:
 		configSpec = GetExtraConfigCustSpec(config, updateArgs)
@@ -297,6 +302,7 @@ func (s *Session) customize(
 		// In reality, the webhook will prevent "Sysprep" from being used unless
 		// the FSS is enabled.
 		if lib.IsWindowsSysprepFSSEnabled() {
+			TemplateVMMetadata(vmCtx, resVM, updateArgs)
 			configSpec = GetOvfEnvCustSpec(config, updateArgs)
 			custSpec, err = GetSysprepCustSpec(vmCtx.VM.Name, updateArgs)
 		}

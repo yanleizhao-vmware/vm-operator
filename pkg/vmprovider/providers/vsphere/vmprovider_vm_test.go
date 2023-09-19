@@ -744,6 +744,227 @@ func vmTests() {
 					Expect(dev.Key).ToNot(Equal(int32(-42)))
 				})
 			})
+
+			Context("VM Class Config does not specify a hardware version", func() {
+
+				Context("VM Class has vGPU and/or DDPIO devices", func() {
+					BeforeEach(func() {
+						// Create the ConfigSpec with a GPU and a DDPIO device.
+						configSpec = &types.VirtualMachineConfigSpec{
+							Name: "dummy-VM",
+							DeviceChange: []types.BaseVirtualDeviceConfigSpec{
+								&types.VirtualDeviceConfigSpec{
+									Operation: types.VirtualDeviceConfigSpecOperationAdd,
+									Device: &types.VirtualPCIPassthrough{
+										VirtualDevice: types.VirtualDevice{
+											Backing: &types.VirtualPCIPassthroughVmiopBackingInfo{
+												Vgpu: "profile-from-configspec",
+											},
+										},
+									},
+								},
+								&types.VirtualDeviceConfigSpec{
+									Operation: types.VirtualDeviceConfigSpecOperationAdd,
+									Device: &types.VirtualPCIPassthrough{
+										VirtualDevice: types.VirtualDevice{
+											Backing: &types.VirtualPCIPassthroughDynamicBackingInfo{
+												AllowedDevice: []types.VirtualPCIPassthroughAllowedDevice{
+													{
+														VendorId: 52,
+														DeviceId: 53,
+													},
+												},
+												CustomLabel: "label-from-configspec",
+											},
+										},
+									},
+								},
+							},
+						}
+					})
+
+					It("creates a VM with a hardware version minimum supported for PCI devices", func() {
+						var o mo.VirtualMachine
+						Expect(vcVM.Properties(ctx, vcVM.Reference(), nil, &o)).To(Succeed())
+						Expect(o.Config.Version).To(Equal(fmt.Sprintf("vmx-%d", constants.MinSupportedHWVersionForPCIPassthruDevices)))
+					})
+				})
+
+				Context("VM Class has vGPU and/or DDPIO devices and VM spec has a PVC", func() {
+					BeforeEach(func() {
+						// Create the ConfigSpec with a GPU and a DDPIO device.
+						configSpec = &types.VirtualMachineConfigSpec{
+							Name: "dummy-VM",
+							DeviceChange: []types.BaseVirtualDeviceConfigSpec{
+								&types.VirtualDeviceConfigSpec{
+									Operation: types.VirtualDeviceConfigSpecOperationAdd,
+									Device: &types.VirtualPCIPassthrough{
+										VirtualDevice: types.VirtualDevice{
+											Backing: &types.VirtualPCIPassthroughVmiopBackingInfo{
+												Vgpu: "profile-from-configspec",
+											},
+										},
+									},
+								},
+								&types.VirtualDeviceConfigSpec{
+									Operation: types.VirtualDeviceConfigSpecOperationAdd,
+									Device: &types.VirtualPCIPassthrough{
+										VirtualDevice: types.VirtualDevice{
+											Backing: &types.VirtualPCIPassthroughDynamicBackingInfo{
+												AllowedDevice: []types.VirtualPCIPassthroughAllowedDevice{
+													{
+														VendorId: 52,
+														DeviceId: 53,
+													},
+												},
+												CustomLabel: "label-from-configspec",
+											},
+										},
+									},
+								},
+							},
+						}
+
+						vm.Spec.Volumes = []vmopv1.VirtualMachineVolume{
+							{
+								Name: "dummy-vol",
+								PersistentVolumeClaim: &vmopv1.PersistentVolumeClaimVolumeSource{
+									PersistentVolumeClaimVolumeSource: corev1.PersistentVolumeClaimVolumeSource{
+										ClaimName: "pvc-claim-1",
+									},
+								},
+							},
+						}
+
+						vm.Status.Volumes = []vmopv1.VirtualMachineVolumeStatus{
+							{
+								Name:     "dummy-vol",
+								Attached: true,
+							},
+						}
+					})
+
+					It("creates a VM with a hardware version minimum supported for PCI devices", func() {
+						var o mo.VirtualMachine
+						Expect(vcVM.Properties(ctx, vcVM.Reference(), nil, &o)).To(Succeed())
+						Expect(o.Config.Version).To(Equal(fmt.Sprintf("vmx-%d", constants.MinSupportedHWVersionForPCIPassthruDevices)))
+					})
+				})
+
+				Context("VM spec has a PVC", func() {
+					BeforeEach(func() {
+						vm.Spec.Volumes = []vmopv1.VirtualMachineVolume{
+							{
+								Name: "dummy-vol",
+								PersistentVolumeClaim: &vmopv1.PersistentVolumeClaimVolumeSource{
+									PersistentVolumeClaimVolumeSource: corev1.PersistentVolumeClaimVolumeSource{
+										ClaimName: "pvc-claim-1",
+									},
+								},
+							},
+						}
+
+						vm.Status.Volumes = []vmopv1.VirtualMachineVolumeStatus{
+							{
+								Name:     "dummy-vol",
+								Attached: true,
+							},
+						}
+					})
+
+					It("creates a VM with a hardware version minimum supported for PVCs", func() {
+						var o mo.VirtualMachine
+						Expect(vcVM.Properties(ctx, vcVM.Reference(), nil, &o)).To(Succeed())
+						Expect(o.Config.Version).To(Equal(fmt.Sprintf("vmx-%d", constants.MinSupportedHWVersionForPVC)))
+					})
+				})
+			})
+
+			Context("VMClassAsConfig FSS is Enabled", func() {
+
+				BeforeEach(func() {
+					testConfig.WithVMClassAsConfig = true
+				})
+
+				When("configSpec has disk and disk controllers", func() {
+					BeforeEach(func() {
+						configSpec = &types.VirtualMachineConfigSpec{
+							Name: "dummy-VM",
+							DeviceChange: []types.BaseVirtualDeviceConfigSpec{
+								&types.VirtualDeviceConfigSpec{
+									Operation: types.VirtualDeviceConfigSpecOperationAdd,
+									Device: &types.VirtualSATAController{
+										VirtualController: types.VirtualController{
+											VirtualDevice: types.VirtualDevice{
+												Key: 101,
+											},
+										},
+									},
+								},
+								&types.VirtualDeviceConfigSpec{
+									Operation: types.VirtualDeviceConfigSpecOperationAdd,
+									Device: &types.VirtualSCSIController{
+										VirtualController: types.VirtualController{
+											VirtualDevice: types.VirtualDevice{
+												Key: 103,
+											},
+										},
+									},
+								},
+								&types.VirtualDeviceConfigSpec{
+									Operation: types.VirtualDeviceConfigSpecOperationAdd,
+									Device: &types.VirtualNVMEController{
+										VirtualController: types.VirtualController{
+											VirtualDevice: types.VirtualDevice{
+												Key: 104,
+											},
+										},
+									},
+								},
+								&types.VirtualDeviceConfigSpec{
+									Operation: types.VirtualDeviceConfigSpecOperationAdd,
+									Device: &types.VirtualDisk{
+										CapacityInBytes: 1024,
+										VirtualDevice: types.VirtualDevice{
+											Key: -42,
+											Backing: &types.VirtualDiskFlatVer2BackingInfo{
+												ThinProvisioned: pointer.Bool(true),
+											},
+										},
+									},
+								},
+							},
+						}
+					})
+
+					It("creates a VM with disk controllers", func() {
+						var o mo.VirtualMachine
+						Expect(vcVM.Properties(ctx, vcVM.Reference(), nil, &o)).To(Succeed())
+
+						devList := object.VirtualDeviceList(o.Config.Hardware.Device)
+						satacont := devList.SelectByType(&types.VirtualSATAController{})
+						Expect(satacont).To(HaveLen(1))
+						dev := satacont[0].GetVirtualDevice()
+						Expect(dev.Key).To(Equal(int32(101)))
+
+						scsicont := devList.SelectByType(&types.VirtualSCSIController{})
+						Expect(scsicont).To(HaveLen(1))
+						dev = scsicont[0].GetVirtualDevice()
+						Expect(dev.Key).To(Equal(int32(103)))
+
+						nvmecont := devList.SelectByType(&types.VirtualNVMEController{})
+						Expect(nvmecont).To(HaveLen(1))
+						dev = nvmecont[0].GetVirtualDevice()
+						Expect(dev.Key).To(Equal(int32(104)))
+
+						// only preexisting disk should be present on VM -- len: 1
+						disks := devList.SelectByType(&types.VirtualDisk{})
+						Expect(disks).To(HaveLen(1))
+						dev1 := disks[0].GetVirtualDevice()
+						Expect(dev1.Key).ToNot(Equal(int32(-42)))
+					})
+				})
+			})
 		})
 
 		Context("CreateOrUpdate VM", func() {
@@ -1270,6 +1491,84 @@ func vmTests() {
 						It("Global config is included in ExtraConfig", func() {
 							Expect(ec).To(HaveKeyWithValue("Foo", "f00"))
 							Expect(ec).To(HaveKeyWithValue("Bar", "42"))
+						})
+					})
+				})
+
+				Context("Cloudinint Transport without userdata", func() {
+					var ec map[string]interface{}
+
+					It("Metadata data is included in ExtraConfig", func() {
+						vm.Spec.VmMetadata = &vmopv1.VirtualMachineMetadata{
+							Transport: vmopv1.VirtualMachineMetadataCloudInitTransport,
+						}
+						vcVM, err := createOrUpdateAndGetVcVM(ctx, vm)
+						Expect(err).ToNot(HaveOccurred())
+
+						var o mo.VirtualMachine
+						Expect(vcVM.Properties(ctx, vcVM.Reference(), nil, &o)).To(Succeed())
+
+						ec = map[string]interface{}{}
+						for _, option := range o.Config.ExtraConfig {
+							if val := option.GetOptionValue(); val != nil {
+								ec[val.Key] = val.Value.(string)
+							}
+						}
+						By("Should include default keys and values", func() {
+							Expect(ec).To(HaveKeyWithValue("disk.enableUUID", "TRUE"))
+							Expect(ec).To(HaveKeyWithValue("vmware.tools.gosc.ignoretoolscheck", "TRUE"))
+						})
+
+						By("Should include guestinfo metadata and no guestinfo userdata", func() {
+							Expect(ec).To(HaveKey("guestinfo.metadata"))
+							Expect(ec).To(HaveKey("guestinfo.metadata.encoding"))
+							Expect(ec).ToNot(HaveKey("guestinfo.userdata"))
+						})
+					})
+				})
+
+				Context("Cloudinint Transport with userdata", func() {
+					var ec map[string]interface{}
+
+					It("Metadata data is included in ExtraConfig", func() {
+						configMap := &corev1.ConfigMap{
+							ObjectMeta: metav1.ObjectMeta{
+								GenerateName: "md-configmap-",
+								Namespace:    vm.Namespace,
+							},
+							Data: map[string]string{
+								"user-data": "data",
+							},
+						}
+						Expect(ctx.Client.Create(ctx, configMap)).To(Succeed())
+
+						vm.Spec.VmMetadata = &vmopv1.VirtualMachineMetadata{
+							ConfigMapName: configMap.Name,
+							Transport:     vmopv1.VirtualMachineMetadataCloudInitTransport,
+						}
+
+						vcVM, err := createOrUpdateAndGetVcVM(ctx, vm)
+						Expect(err).ToNot(HaveOccurred())
+
+						var o mo.VirtualMachine
+						Expect(vcVM.Properties(ctx, vcVM.Reference(), nil, &o)).To(Succeed())
+
+						ec = map[string]interface{}{}
+						for _, option := range o.Config.ExtraConfig {
+							if val := option.GetOptionValue(); val != nil {
+								ec[val.Key] = val.Value.(string)
+							}
+						}
+						By("Should include default keys and values", func() {
+							Expect(ec).To(HaveKeyWithValue("disk.enableUUID", "TRUE"))
+							Expect(ec).To(HaveKeyWithValue("vmware.tools.gosc.ignoretoolscheck", "TRUE"))
+						})
+
+						By("Should include guestinfo metadata and userdata", func() {
+							Expect(ec).To(HaveKey("guestinfo.metadata"))
+							Expect(ec).To(HaveKey("guestinfo.metadata.encoding"))
+							Expect(ec).To(HaveKey("guestinfo.userdata"))
+							Expect(ec).To(HaveKey("guestinfo.userdata.encoding"))
 						})
 					})
 				})

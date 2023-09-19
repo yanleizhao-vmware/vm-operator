@@ -15,11 +15,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/vmware/govmomi/vim25/types"
 
-	imgregv1a1 "github.com/vmware-tanzu/vm-operator/external/image-registry/api/v1alpha1"
+	imgregv1a1 "github.com/vmware-tanzu/image-registry-operator-api/api/v1alpha1"
 
 	vmopv1 "github.com/vmware-tanzu/vm-operator/api/v1alpha1"
-
-	clutils "github.com/vmware-tanzu/vm-operator/controllers/contentlibrary/utils"
+	clutils "github.com/vmware-tanzu/vm-operator/controllers/contentlibrary/v1alpha1/utils"
 	"github.com/vmware-tanzu/vm-operator/pkg/conditions"
 	"github.com/vmware-tanzu/vm-operator/pkg/context"
 	"github.com/vmware-tanzu/vm-operator/pkg/lib"
@@ -99,21 +98,21 @@ func GetVirtualMachineClass(
 	return vmClass, nil
 }
 
-func GetVMImageStatusAndContentLibraryUUID(
+func GetVMImageAndContentLibraryUUID(
 	vmCtx context.VirtualMachineContext,
-	k8sClient ctrlclient.Client) (*vmopv1.VirtualMachineImageStatus, string, error) {
+	k8sClient ctrlclient.Client) (*vmopv1.VirtualMachineImageSpec, *vmopv1.VirtualMachineImageStatus, string, error) {
 
 	imageName := vmCtx.VM.Spec.ImageName
 	if lib.IsWCPVMImageRegistryEnabled() {
-		vmImageStatus, err := resolveVMImageStatus(vmCtx, k8sClient, imageName)
+		vmImageSpec, vmImageStatus, err := resolveVMImage(vmCtx, k8sClient, imageName)
 		if err != nil {
-			return nil, "", err
+			return nil, nil, "", err
 		}
 		uuid, err := resolveContentLibraryUUID(vmCtx, k8sClient, vmImageStatus)
 		if err != nil {
-			return nil, "", err
+			return nil, nil, "", err
 		}
-		return vmImageStatus, uuid, nil
+		return vmImageSpec, vmImageStatus, uuid, nil
 	}
 
 	// The following code path is reachable only when the WCP-VM-Image-Registry FSS is disabled.
@@ -126,7 +125,7 @@ func GetVMImageStatusAndContentLibraryUUID(
 			vmopv1.VirtualMachineImageNotFoundReason,
 			vmopv1.ConditionSeverityError,
 			msg)
-		return nil, "", errors.Wrap(err, msg)
+		return nil, nil, "", errors.Wrap(err, msg)
 	}
 
 	var clProviderName string
@@ -138,7 +137,7 @@ func GetVMImageStatusAndContentLibraryUUID(
 	}
 	if clProviderName == "" {
 		if SkipVMImageCLProviderCheck {
-			return &vmImage.Status, "", nil
+			return &vmImage.Spec, &vmImage.Status, "", nil
 		}
 
 		msg := fmt.Sprintf("VirtualMachineImage %s does not have a ContentLibraryProvider OwnerReference", imageName)
@@ -147,7 +146,7 @@ func GetVMImageStatusAndContentLibraryUUID(
 			vmopv1.ContentLibraryProviderNotFoundReason,
 			vmopv1.ConditionSeverityError,
 			msg)
-		return nil, "", errors.New(msg)
+		return nil, nil, "", errors.New(msg)
 	}
 
 	clProvider := &vmopv1.ContentLibraryProvider{}
@@ -158,7 +157,7 @@ func GetVMImageStatusAndContentLibraryUUID(
 			vmopv1.ContentLibraryProviderNotFoundReason,
 			vmopv1.ConditionSeverityError,
 			msg)
-		return nil, "", errors.Wrap(err, msg)
+		return nil, nil, "", errors.Wrap(err, msg)
 	}
 
 	clUUID := clProvider.Spec.UUID
@@ -178,7 +177,7 @@ func GetVMImageStatusAndContentLibraryUUID(
 			vmopv1.ContentSourceBindingNotFoundReason,
 			vmopv1.ConditionSeverityError,
 			msg)
-		return nil, "", errors.New(msg)
+		return nil, nil, "", errors.New(msg)
 	}
 
 	csBindingList := &vmopv1.ContentSourceBindingList{}
@@ -190,7 +189,7 @@ func GetVMImageStatusAndContentLibraryUUID(
 			vmopv1.ConditionSeverityError,
 			msg)
 		vmCtx.Logger.Error(err, msg)
-		return nil, "", errors.Wrap(err, msg)
+		return nil, nil, "", errors.Wrap(err, msg)
 	}
 
 	// Filter the bindings for the specified ContentSource.
@@ -210,10 +209,10 @@ func GetVMImageStatusAndContentLibraryUUID(
 			vmopv1.ContentSourceBindingNotFoundReason,
 			vmopv1.ConditionSeverityError,
 			msg)
-		return nil, "", errors.New(msg)
+		return nil, nil, "", errors.New(msg)
 	}
 
-	return &vmImage.Status, clUUID, nil
+	return &vmImage.Spec, &vmImage.Status, clUUID, nil
 }
 
 func GetVMMetadata(
@@ -233,6 +232,9 @@ func GetVMMetadata(
 		return vmMD, errors.New("invalid VM Metadata: both ConfigMapName and SecretName are specified")
 	}
 
+	// ConfigMap and Secret can be both empty.
+	vmMD.Transport = metadata.Transport
+
 	if metadata.ConfigMapName != "" {
 		cm := &corev1.ConfigMap{}
 		err := k8sClient.Get(vmCtx, ctrlclient.ObjectKey{Name: metadata.ConfigMapName, Namespace: vmCtx.VM.Namespace}, cm)
@@ -240,8 +242,6 @@ func GetVMMetadata(
 			// TODO: Condition
 			return vmMD, errors.Wrap(err, "Failed to get VM Metadata ConfigMap")
 		}
-
-		vmMD.Transport = metadata.Transport
 		vmMD.Data = cm.Data
 	} else if metadata.SecretName != "" {
 		secret := &corev1.Secret{}
@@ -250,8 +250,6 @@ func GetVMMetadata(
 			// TODO: Condition
 			return vmMD, errors.Wrap(err, "Failed to get VM Metadata Secret")
 		}
-
-		vmMD.Transport = metadata.Transport
 		vmMD.Data = make(map[string]string)
 		for k, v := range secret.Data {
 			vmMD.Data[k] = string(v)
@@ -342,14 +340,14 @@ func GetVMClassConfigSpec(raw json.RawMessage) (*types.VirtualMachineConfigSpec,
 	return classConfigSpec, nil
 }
 
-// resolveVMImageStatus returns a VirtualMachineImageStatus from the given image name.
+// resolveVMImage returns a VirtualMachineImageSpec and VirtualMachineImageStatus from the given image name.
 // It updates the VM condition if the image is not found or not in expected condition.
-func resolveVMImageStatus(
+func resolveVMImage(
 	vmCtx context.VirtualMachineContext,
 	k8sClient ctrlclient.Client,
-	imageName string) (*vmopv1.VirtualMachineImageStatus, error) {
+	imageName string) (*vmopv1.VirtualMachineImageSpec, *vmopv1.VirtualMachineImageStatus, error) {
 
-	_, imageStatus, err := clutils.GetVMImageSpecStatus(vmCtx, k8sClient, imageName, vmCtx.VM.Namespace)
+	imageSpec, imageStatus, err := clutils.GetVMImageSpecStatus(vmCtx, k8sClient, imageName, vmCtx.VM.Namespace)
 	if err != nil {
 		imageNotFoundMsg := fmt.Sprintf("Failed to get the VM's image: %s", imageName)
 		conditions.MarkFalse(vmCtx.VM,
@@ -358,7 +356,7 @@ func resolveVMImageStatus(
 			vmopv1.ConditionSeverityError,
 			imageNotFoundMsg,
 		)
-		return nil, errors.Wrap(err, imageNotFoundMsg)
+		return nil, nil, errors.Wrap(err, imageNotFoundMsg)
 	}
 
 	// Do not return the VM image status if the current image condition is not satisfied.
@@ -381,10 +379,10 @@ func resolveVMImageStatus(
 			vmopv1.ConditionSeverityError,
 			imageNotReadyMsg,
 		)
-		return nil, errors.New(imageNotReadyMsg)
+		return nil, nil, errors.New(imageNotReadyMsg)
 	}
 
-	return imageStatus, nil
+	return imageSpec, imageStatus, nil
 }
 
 // resolveContentLibraryUUID returns the content library UUID from the given image status reference.
@@ -439,4 +437,39 @@ func resolveContentLibraryUUID(
 	}
 
 	return libraryUUID, nil
+}
+
+// HasPVC returns true if the VirtualMachine spec has a Persistent Volume claim.
+func HasPVC(vmSpec vmopv1.VirtualMachineSpec) bool {
+	for _, vol := range vmSpec.Volumes {
+		if vol.PersistentVolumeClaim != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// HardwareVersionForPVCandPCIDevices returns a hardware version for VMs with PVCs and PCI devices(vGPUs/DDPIO devices)
+// The hardware version is determined based on the below criteria: VMs with
+// - Persistent Volume Claim (PVC) get the max(the image hardware version, minimum supported virtual hardware version for persistent volumes)
+// - vGPUs/DDPIO devices get the max(the image hardware version, minimum supported virtual hardware version for PCI devices)
+// - Both vGPU/DDPIO devices and PVCs get the max(the image hardware version, minimum supported virtual hardware version for PCI devices)
+// - none of the above returns 0.
+func HardwareVersionForPVCandPCIDevices(imageHWVersion int32, configSpec *types.VirtualMachineConfigSpec, hasPVC bool) int32 {
+	var configSpecHWVersion int32
+	configSpecDevs := util.DevicesFromConfigSpec(configSpec)
+
+	if len(util.SelectNvidiaVgpu(configSpecDevs)) > 0 || len(util.SelectDynamicDirectPathIO(configSpecDevs)) > 0 {
+		configSpecHWVersion = constants.MinSupportedHWVersionForPCIPassthruDevices
+		if imageHWVersion != 0 && imageHWVersion > constants.MinSupportedHWVersionForPCIPassthruDevices {
+			configSpecHWVersion = imageHWVersion
+		}
+	} else if hasPVC {
+		configSpecHWVersion = constants.MinSupportedHWVersionForPVC
+		if imageHWVersion != 0 && imageHWVersion > constants.MinSupportedHWVersionForPVC {
+			configSpecHWVersion = imageHWVersion
+		}
+	}
+
+	return configSpecHWVersion
 }

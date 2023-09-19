@@ -23,11 +23,24 @@ const (
 	// For more information please see VirtualMachineImage.Status.Ready.
 	VirtualMachineConditionImageReady = "VirtualMachineImageReady"
 
-	VirtualMachineConditionNetworkReady = "VirtualMachineNetworkReady"
+	// VirtualMachineConditionVMSetResourcePolicyReady indicates that a referenced
+	// VirtualMachineSetResourcePolicy is Ready.
+	VirtualMachineConditionVMSetResourcePolicyReady = "VirtualMachineConditionVMSetResourcePolicyReady"
 
+	// VirtualMachineConditionStorageReady indicates that the storage prerequisites for the VM are ready.
 	VirtualMachineConditionStorageReady = "VirtualMachineStorageReady"
 
+	// VirtualMachineConditionBootstrapReady indicates that the bootstrap prerequisites for the VM are ready.
 	VirtualMachineConditionBootstrapReady = "VirtualMachineBootstrapReady"
+
+	// VirtualMachineConditionNetworkReady indicates that the network prerequisites for the VM are ready.
+	VirtualMachineConditionNetworkReady = "VirtualMachineNetworkReady"
+
+	// VirtualMachineConditionPlacementReady indicates that the placement decision for the VM is ready.
+	VirtualMachineConditionPlacementReady = "VirtualMachineConditionPlacementReady"
+
+	// VirtualMachineConditionCreated indicates that the VM has been created.
+	VirtualMachineConditionCreated = "VirtualMachineCreated"
 )
 
 const (
@@ -80,6 +93,15 @@ const (
 	//
 	// The VM will not be reconciled again until this annotation is removed.
 	PauseAnnotation = GroupName + "/pause-reconcile"
+
+	// InstanceIDAnnotation is an annotation that can be applied to set Cloud-Init metadata Instance ID.
+	//
+	// This cannot be set by users. It is for VM Operator to handle corner cases.
+	//
+	// In a corner case where a VM first boot failed to bootstrap with Cloud-Init, VM Operator sets Instance ID
+	// the same with the first boot Instance ID to prevent Cloud-Init from treating this VM as first boot
+	// due to different Instance ID. This annotation is used in upgrade script.
+	InstanceIDAnnotation = GroupName + "/cloud-init-instance-id"
 )
 
 // VirtualMachinePowerState defines a VM's desired and observed power states.
@@ -101,7 +123,7 @@ const (
 )
 
 // VirtualMachinePowerOpMode represents the various power operation modes when
-// when powering off or suspending a VM.
+// powering off or suspending a VM.
 // +kubebuilder:validation:Enum=Hard;Soft;TrySoft
 type VirtualMachinePowerOpMode string
 
@@ -449,8 +471,16 @@ type VirtualMachine struct {
 	Status VirtualMachineStatus `json:"status,omitempty"`
 }
 
-func (vm VirtualMachine) NamespacedName() string {
+func (vm *VirtualMachine) NamespacedName() string {
 	return vm.Namespace + "/" + vm.Name
+}
+
+func (vm *VirtualMachine) GetConditions() []metav1.Condition {
+	return vm.Status.Conditions
+}
+
+func (vm *VirtualMachine) SetConditions(conditions []metav1.Condition) {
+	vm.Status.Conditions = conditions
 }
 
 // +kubebuilder:object:root=true

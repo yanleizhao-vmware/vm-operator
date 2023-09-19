@@ -13,7 +13,6 @@ import (
 )
 
 const (
-	trueString                    = "true"
 	TrueString                    = "true"
 	VmopNamespaceEnv              = "POD_NAMESPACE"
 	WcpFaultDomainsFSS            = "FSS_WCP_FAULTDOMAINS"
@@ -25,6 +24,7 @@ const (
 	VMImageRegistryFSS            = "FSS_WCP_VM_IMAGE_REGISTRY"
 	NamespacedVMClassFSS          = "FSS_WCP_NAMESPACED_VM_CLASS"
 	WindowsSysprepFSS             = "FSS_WCP_WINDOWS_SYSPREP"
+	VMServiceBackupRestoreFSS     = "FSS_WCP_VMSERVICE_BACKUPRESTORE"
 	MaxCreateVMsOnProviderEnv     = "MAX_CREATE_VMS_ON_PROVIDER"
 	DefaultMaxCreateVMsOnProvider = 80
 
@@ -55,6 +55,14 @@ const (
 	NetworkProviderTypeNamed = "NAMED"
 	NetworkProviderTypeNSXT  = "NSXT"
 	NetworkProviderTypeVDS   = "VSPHERE_NETWORK"
+
+	// DefaultVirtualMachineClassControllerNameEnv is the name of the
+	// environment variable that contains the name of the default value for
+	// the VirtualMachineClass field spec.controllerName.
+	//
+	// If the environment variable is not set or empty it will be treated as
+	// if it contains vmoperator.vmware.com/vsphere.
+	DefaultVirtualMachineClassControllerNameEnv = "DEFAULT_VM_CLASS_CONTROLLER_NAME"
 )
 
 // SetVMOpNamespaceEnv sets the VM Operator pod's namespace in the environment.
@@ -80,39 +88,43 @@ var IsNamedNetworkProviderEnabled = func() bool {
 }
 
 var IsWcpFaultDomainsFSSEnabled = func() bool {
-	return os.Getenv(WcpFaultDomainsFSS) == trueString
+	return os.Getenv(WcpFaultDomainsFSS) == TrueString
 }
 
-var IsVMServiceV1Alpha2FSSEnabled = func() bool {
-	return os.Getenv(VMServiceV1Alpha2FSS) == trueString
+func IsVMServiceV1Alpha2FSSEnabled() bool {
+	return os.Getenv(VMServiceV1Alpha2FSS) == TrueString
 }
 
 var IsInstanceStorageFSSEnabled = func() bool {
-	return os.Getenv(InstanceStorageFSS) == trueString
+	return os.Getenv(InstanceStorageFSS) == TrueString
 }
 
 var IsUnifiedTKGFSSEnabled = func() bool {
-	return os.Getenv(UnifiedTKGFSS) == trueString
+	return os.Getenv(UnifiedTKGFSS) == TrueString
 }
 
 var IsVMClassAsConfigFSSEnabled = func() bool {
-	return os.Getenv(VMClassAsConfigFSS) == trueString
+	return os.Getenv(VMClassAsConfigFSS) == TrueString
 }
 
 var IsVMClassAsConfigFSSDaynDateEnabled = func() bool {
-	return os.Getenv(VMClassAsConfigDaynDateFSS) == trueString
+	return os.Getenv(VMClassAsConfigDaynDateFSS) == TrueString
 }
 
 var IsWCPVMImageRegistryEnabled = func() bool {
-	return os.Getenv(VMImageRegistryFSS) == trueString
+	return os.Getenv(VMImageRegistryFSS) == TrueString
 }
 
 var IsNamespacedVMClassFSSEnabled = func() bool {
-	return os.Getenv(NamespacedVMClassFSS) == trueString
+	return os.Getenv(NamespacedVMClassFSS) == TrueString
 }
 
 var IsWindowsSysprepFSSEnabled = func() bool {
-	return os.Getenv(WindowsSysprepFSS) == trueString
+	return os.Getenv(WindowsSysprepFSS) == TrueString
+}
+
+var IsVMServiceBackupRestoreFSSEnabled = func() bool {
+	return os.Getenv(VMServiceBackupRestoreFSS) == TrueString
 }
 
 // MaxConcurrentCreateVMsOnProvider returns the percentage of reconciler
@@ -161,4 +173,14 @@ func GetInstanceStorageRequeueDelay() time.Duration {
 	}
 
 	return wait.Jitter(seedDuration, maxFactor)
+}
+
+// GetDefaultVirtualMachineClassControllerName returns the value to use if
+// a VirtualMachineClass resource's spec.controllerName field is empty.
+var GetDefaultVirtualMachineClassControllerName = func() string {
+	v := os.Getenv(DefaultVirtualMachineClassControllerNameEnv)
+	if v == "" {
+		return "vmoperator.vmware.com/vsphere"
+	}
+	return v
 }

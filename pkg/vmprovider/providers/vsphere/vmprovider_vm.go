@@ -1,4 +1,4 @@
-// Copyright (c) 2022 VMware, Inc. All Rights Reserved.
+// Copyright (c) 2022-2023 VMware, Inc. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package vsphere
@@ -17,7 +17,7 @@ import (
 
 	vmopv1 "github.com/vmware-tanzu/vm-operator/api/v1alpha1"
 
-	imgregv1a1 "github.com/vmware-tanzu/vm-operator/external/image-registry/api/v1alpha1"
+	imgregv1a1 "github.com/vmware-tanzu/image-registry-operator-api/api/v1alpha1"
 
 	"github.com/vmware-tanzu/vm-operator/pkg/conditions"
 	"github.com/vmware-tanzu/vm-operator/pkg/context"
@@ -224,6 +224,32 @@ func (vs *vSphereVMProvider) PublishVirtualMachine(ctx goctx.Context, vm *vmopv1
 		return "", err
 	}
 	return itemID, nil
+}
+
+// BackupVirtualMachine backs up the VM data required for restore.
+func (vs *vSphereVMProvider) BackupVirtualMachine(ctx goctx.Context, vm *vmopv1.VirtualMachine) error {
+	client, err := vs.getVcClient(ctx)
+	if err != nil {
+		return errors.Wrapf(err, "failed to get vCenter client for backing up Virtual Machine")
+	}
+
+	vmCtx := context.VirtualMachineContext{
+		Context: goctx.WithValue(ctx, types.ID{}, vs.getOpID(vm, "backupVM")),
+		Logger:  log.WithValues("vmName", vm.NamespacedName()),
+		VM:      vm,
+	}
+
+	vcVM, err := vs.getVM(vmCtx, client, true)
+	if err != nil {
+		return errors.Wrapf(err, "failed to get vSphere Virtual Machine for backing up")
+	}
+
+	vmMetadata, err := GetVMMetadata(vmCtx, vs.k8sClient)
+	if err != nil {
+		return errors.Wrapf(err, "failed to get VM metadata for backing up")
+	}
+
+	return virtualmachine.BackupVirtualMachine(vmCtx, vcVM, vmMetadata.Data)
 }
 
 func (vs *vSphereVMProvider) GetVirtualMachineGuestHeartbeat(
@@ -622,7 +648,7 @@ func (vs *vSphereVMProvider) vmCreateGetPrereqs(
 		return nil, err
 	}
 
-	vmImageStatus, clUUID, err := GetVMImageStatusAndContentLibraryUUID(vmCtx, vs.k8sClient)
+	vmImageSpec, vmImageStatus, clUUID, err := GetVMImageAndContentLibraryUUID(vmCtx, vs.k8sClient)
 	if err != nil {
 		return nil, err
 	}
@@ -639,6 +665,7 @@ func (vs *vSphereVMProvider) vmCreateGetPrereqs(
 
 	createArgs := &vmCreateArgs{}
 	createArgs.VMClass = vmClass
+	createArgs.VMImageSpec = vmImageSpec
 	createArgs.VMImageStatus = vmImageStatus
 	createArgs.ContentLibraryUUID = clUUID
 	createArgs.VMMetadata = vmMD
@@ -734,6 +761,15 @@ func (vs *vSphereVMProvider) vmCreateGenConfigSpec(
 		createArgs.StorageClassesToIDs,
 		createArgs.VMImageStatus.Firmware,
 		vmClassConfigSpec)
+
+	// Set a hardware version in the create config spec when VMs are created with PVCs/PCI(vGPU and DDPIO) devices
+	// and VMClass config spec has an empty hardware version.
+	if lib.IsVMClassAsConfigFSSDaynDateEnabled() && createArgs.ConfigSpec.Version == "" {
+		if version := HardwareVersionForPVCandPCIDevices(createArgs.VMImageSpec.HardwareVersion,
+			createArgs.ConfigSpec, HasPVC(vmCtx.VM.Spec)); version != 0 {
+			createArgs.ConfigSpec.Version = fmt.Sprintf("vmx-%d", version)
+		}
+	}
 }
 
 func (vs *vSphereVMProvider) vmCreateValidateArgs(
@@ -821,7 +857,7 @@ func (vs *vSphereVMProvider) vmUpdateGetArgs(
 	imageFirmware := ""
 	// Only get VM image when this is the VM first boot.
 	if isVMFirstBoot(vmCtx) {
-		vmImageStatus, _, err := GetVMImageStatusAndContentLibraryUUID(vmCtx, vs.k8sClient)
+		_, vmImageStatus, _, err := GetVMImageAndContentLibraryUUID(vmCtx, vs.k8sClient)
 		if err != nil {
 			return nil, err
 		}
