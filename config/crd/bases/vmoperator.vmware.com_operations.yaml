@@ -35,10 +35,38 @@ spec:
           spec:
             description: OperationSpec defines the desired state of Operation
             properties:
+              destination:
+                properties:
+                  name:
+                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                    type: string
+                  namespace:
+                    description: 'Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/'
+                    type: string
+                type: object
               entityName:
                 type: string
               operationType:
                 type: string
+              relocateSpec:
+                properties:
+                  datastoreName:
+                    type: string
+                  folderName:
+                    type: string
+                  hostIp:
+                    type: string
+                  resourcePoolName:
+                    type: string
+                  vmNetworkName:
+                    type: string
+                required:
+                - datastoreName
+                - folderName
+                - hostIp
+                - resourcePoolName
+                - vmNetworkName
+                type: object
               vmSpec:
                 description: VirtualMachineSpec defines the desired state of a VirtualMachine.
                 properties:
@@ -435,7 +463,6 @@ spec:
             required:
             - entityName
             - operationType
-            - vmSpec
             type: object
           status:
             description: OperationStatus defines the observed state of Operation

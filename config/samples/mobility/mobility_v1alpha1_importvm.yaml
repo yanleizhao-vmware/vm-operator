@@ -2,25 +2,26 @@ apiVersion: vmoperator.vmware.com/v1alpha1
 kind: Operation
 metadata:
   name: import
-  namespace: mobility-service-0
+  namespace: mobility-service-1
 spec:
   operationType: Import
   entityName: centos-cloudinit-example
   vmSpec:
     networkInterfaces:
-    - networkName: "primary"
+    - networkName: "primary-2"
       networkType: vsphere-distributed
     className: best-effort-small
     imageName: vmi-0992e8a6bf35e6e1f
     powerState: poweredOff
+    storageClass: wcpglobal-storage-profile
 ---
 apiVersion: vmoperator.vmware.com/v1alpha1
 kind: Plan
 metadata:
   name: importvm-plan
-  namespace: mobility-service-0
+  namespace: mobility-service-1
 spec:
   operations:
     - kind: Operation
-      namespace: mobility-service-0
-      name: import
+      namespace: mobility-service-1
+      name: import-operation

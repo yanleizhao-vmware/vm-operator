@@ -60,25 +60,33 @@ func (vs *vSphereVMProvider) CreateOrUpdateVirtualMachine(
 		VM:      vm,
 	}
 
+	vmCtx.Logger.Info("CreateOrUpdateVirtualMachine", "vm", vm)
+
 	client, err := vs.getVcClient(vmCtx)
 	if err != nil {
+		vmCtx.Logger.Error(err, "Failed to get VC client")
 		return err
 	}
 
 	vcVM, err := vs.getVM(vmCtx, client, false)
 	if err != nil {
+		vmCtx.Logger.Error(err, "Failed to get VM")
 		return err
 	}
+
+	vmCtx.Logger.Info("vcVM", "vcVM", vcVM)
 
 	if vcVM == nil {
 		vcVM, err = vs.createVirtualMachine(vmCtx, client)
 		if err != nil {
+			vmCtx.Logger.Error(err, "Failed to create VM")
 			return err
 		}
 
 		if vcVM == nil {
 			// Creation was not ready or blocked for some reason. We depend on the controller
 			// to eventually retry the create.
+			vmCtx.Logger.Info("VM creation not ready")
 			return nil
 		}
 	}
@@ -102,7 +110,7 @@ func GetNetworkFromVM(vmCtx *context.VirtualMachineContext, vm *object.VirtualMa
 	return nil, errors.New("VM doesn't have a network card")
 }
 
-func (vs *vSphereVMProvider) RelocateVirtualMachine(ctx goctx.Context, vm *vmopv1.VirtualMachine) error {
+func (vs *vSphereVMProvider) RelocateVirtualMachine(ctx goctx.Context, vm *vmopv1.VirtualMachine, supervisorRelocateSpec *vmopv1.RelocateSpec) error {
 	vmCtx := context.VirtualMachineContext{
 		Context: goctx.WithValue(ctx, types.ID{}, vs.getOpID(vm, "relocateVM")),
 		Logger:  log.WithValues("vmName", vm.NamespacedName()),
@@ -123,21 +131,21 @@ func (vs *vSphereVMProvider) RelocateVirtualMachine(ctx goctx.Context, vm *vmopv
 	}
 	vmCtx.Logger.Info("Relocating VM", "vm", vcVM.Reference())
 
-	dstHost, err := client.Finder().HostSystem(vmCtx, "10.78.84.192")
+	dstHost, err := client.Finder().HostSystem(vmCtx, supervisorRelocateSpec.HostIp)
 	if err != nil {
 		return err
 	}
 	dstHostMoRef := dstHost.Reference()
 	vmCtx.Logger.Info("Dst host", "host", dstHostMoRef)
 
-	dstPool, err := client.Finder().ResourcePool(vmCtx, "mobility-service-1")
+	dstPool, err := client.Finder().ResourcePool(vmCtx, supervisorRelocateSpec.ResourcePoolName)
 	if err != nil {
 		return err
 	}
 	dstPoolMoRef := dstPool.Reference()
 	vmCtx.Logger.Info("Dst resource pool", "rp", dstPoolMoRef)
 
-	dstDs, err := client.Finder().Datastore(vmCtx, "sharedVmfs-0 (1)")
+	dstDs, err := client.Finder().Datastore(vmCtx, supervisorRelocateSpec.DatastoreName)
 	if err != nil {
 		return err
 	}
@@ -145,7 +153,7 @@ func (vs *vSphereVMProvider) RelocateVirtualMachine(ctx goctx.Context, vm *vmopv
 	vmCtx.Logger.Info("Dst datastore", "ds", dstDsMoRef)
 
 	dstVmNetworkName := "primary-vds-2"
-	dstNetwork, err := client.Finder().Network(vmCtx, dstVmNetworkName)
+	dstNetwork, err := client.Finder().Network(vmCtx, supervisorRelocateSpec.VmNetworkName)
 	if err != nil {
 		return err
 	}
@@ -167,10 +175,18 @@ func (vs *vSphereVMProvider) RelocateVirtualMachine(ctx goctx.Context, vm *vmopv
 	}
 	deviceConfigSpecs = append(deviceConfigSpecs, deviceConfigSpec)
 
+	dstFolder, err := client.Finder().Folder(vmCtx, supervisorRelocateSpec.FolderName)
+	if err != nil {
+		return err
+	}
+	dstFolderMoRef := dstFolder.Reference()
+	vmCtx.Logger.Info("Dst folder", "folder", dstFolderMoRef)
+
 	relocateSpec := types.VirtualMachineRelocateSpec{
-		Host:         &dstHostMoRef,
-		Pool:         &dstPoolMoRef,
+		Folder:       &dstFolderMoRef,
 		Datastore:    &dstDsMoRef,
+		Pool:         &dstPoolMoRef,
+		Host:         &dstHostMoRef,
 		DeviceChange: deviceConfigSpecs,
 	}
 
@@ -416,6 +432,7 @@ func (vs *vSphereVMProvider) updateVirtualMachine(
 
 		cluster, err := virtualmachine.GetVMClusterComputeResource(vmCtx, vcVM)
 		if err != nil {
+			vmCtx.Logger.Error(err, "GetVMClusterComputeResource failed")
 			return err
 		}
 
@@ -433,6 +450,7 @@ func (vs *vSphereVMProvider) updateVirtualMachine(
 
 		err = ses.UpdateVirtualMachine(vmCtx, vcVM, getUpdateArgsFn)
 		if err != nil {
+			vmCtx.Logger.Error(err, "UpdateVirtualMachine failed")
 			return err
 		}
 	}
