@@ -48,7 +48,8 @@ type RelocateSpec struct {
 // OperationSpec defines the desired state of Operation
 type OperationSpec struct {
 	OperationType OperationType               `json:"operationType"`
-	EntityName    string                      `json:"entityName"`
+	EntityName    string                      `json:"entityName,omitempty"`
+	Entities      EntitiesReference           `json:"entities,omitempty"`
 	VmSpec        VirtualMachineSpec          `json:"vmSpec,omitempty"`
 	Source        VsphereLocationReference    `json:"source,omitempty"`
 	Destination   SupervisorLocationReference `json:"destination,omitempty"`
