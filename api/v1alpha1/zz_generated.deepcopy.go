@@ -717,6 +717,7 @@ func (in *OperationReference) DeepCopy() *OperationReference {
 func (in *OperationSpec) DeepCopyInto(out *OperationSpec) {
 	*out = *in
 	in.VmSpec.DeepCopyInto(&out.VmSpec)
+	out.Source = in.Source
 	out.Destination = in.Destination
 	out.RelocateSpec = in.RelocateSpec
 }

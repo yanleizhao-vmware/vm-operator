@@ -50,6 +50,7 @@ type OperationSpec struct {
 	OperationType OperationType               `json:"operationType"`
 	EntityName    string                      `json:"entityName"`
 	VmSpec        VirtualMachineSpec          `json:"vmSpec,omitempty"`
+	Source        VsphereLocationReference    `json:"source,omitempty"`
 	Destination   SupervisorLocationReference `json:"destination,omitempty"`
 	RelocateSpec  RelocateSpec                `json:"relocateSpec,omitempty"`
 }

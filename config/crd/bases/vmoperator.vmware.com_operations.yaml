@@ -67,6 +67,15 @@ spec:
                 - resourcePoolName
                 - vmNetworkName
                 type: object
+              source:
+                properties:
+                  name:
+                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                    type: string
+                  namespace:
+                    description: 'Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/'
+                    type: string
+                type: object
               vmSpec:
                 description: VirtualMachineSpec defines the desired state of a VirtualMachine.
                 properties:
