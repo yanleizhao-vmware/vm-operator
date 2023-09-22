@@ -5,21 +5,20 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.10.0
   creationTimestamp: null
-  name: supervisorlocations.vmoperator.vmware.com
+  name: vspherevms.vmoperator.vmware.com
 spec:
   group: vmoperator.vmware.com
   names:
-    kind: SupervisorLocation
-    listKind: SupervisorLocationList
-    plural: supervisorlocations
-    singular: supervisorlocation
+    kind: VsphereVM
+    listKind: VsphereVMList
+    plural: vspherevms
+    singular: vspherevm
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: SupervisorLocation is the Schema for the SupervisorLocations
-          API
+        description: VsphereVM is the Schema for the VsphereVMs API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -34,34 +33,14 @@ spec:
           metadata:
             type: object
           spec:
-            description: SupervisorLocationSpec defines the desired state of SupervisorLocation
+            description: VsphereVMSpec defines the desired state of VsphereVM
             properties:
-              host:
-                description: The hostname on which the API server is serving.
+              moid:
+                description: MoID of the vSphere VM
                 type: string
-              identity:
-                description: The secret containing the authentication info for the
-                  API server.
-                properties:
-                  name:
-                    description: name is unique within a namespace to reference a
-                      secret resource.
-                    type: string
-                  namespace:
-                    description: namespace defines the space within which the secret
-                      name must be unique.
-                    type: string
-                type: object
-                x-kubernetes-map-type: atomic
-              namespace:
-                description: The namespace in which the API server is serving.
+              name:
+                description: Name of the vSphere VM
                 type: string
-              port:
-                description: The port on which the API server is serving.
-                format: int32
-                type: integer
-            required:
-            - namespace
             type: object
           status:
             description: SupervisorLocationStatus defines the observed state of SupervisorLocation

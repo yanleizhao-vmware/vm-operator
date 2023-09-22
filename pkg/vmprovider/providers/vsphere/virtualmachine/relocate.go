@@ -1,9 +1,10 @@
 package virtualmachine
 
 import (
-	"github.com/vmware-tanzu/vm-operator/pkg/context"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/types"
+
+	"github.com/vmware-tanzu/vm-operator/pkg/context"
 )
 
 func RelocateVirtualMachine(

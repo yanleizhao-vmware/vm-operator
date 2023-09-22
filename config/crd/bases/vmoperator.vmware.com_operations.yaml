@@ -82,7 +82,7 @@ spec:
                           Required'
                         type: string
                       resourcePool:
-                        description: Parent resource pool of the entities.
+                        description: Parent resource pool MoID of the entities.
                         type: string
                       selector:
                         description: 'Selector is the same as the label selector but

@@ -23,13 +23,16 @@ type SupervisorLocationReference struct {
 // SupervisorLocationSpec defines the desired state of SupervisorLocation
 type SupervisorLocationSpec struct {
 	// The secret containing the authentication info for the API server.
-	Identity corev1.SecretReference `json:"identity"`
+	// +optional
+	Identity corev1.SecretReference `json:"identity,omitempty"`
 
 	// The hostname on which the API server is serving.
-	Host string `json:"host"`
+	// +optional
+	Host string `json:"host,omitempty"`
 
 	// The port on which the API server is serving.
-	Port int32 `json:"port"`
+	// +optional
+	Port int32 `json:"port,omitempty"`
 
 	// The namespace in which the API server is serving.
 	Namespace string `json:"namespace"`

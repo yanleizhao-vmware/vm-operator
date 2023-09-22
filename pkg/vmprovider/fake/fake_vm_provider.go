@@ -363,6 +363,10 @@ func (s *VMProvider) IsPublishVMCalled() bool {
 	return s.isPublishVMCalled
 }
 
+func (s *VMProvider) GetVsphereVMsByResPoolName(ctx context.Context, resPoolName string) ([]vmopv1.VsphereVM, error) {
+	return nil, nil
+}
+
 func NewVMProvider() *VMProvider {
 	provider := VMProvider{
 		vmMap:             map[client.ObjectKey]*vmopv1.VirtualMachine{},

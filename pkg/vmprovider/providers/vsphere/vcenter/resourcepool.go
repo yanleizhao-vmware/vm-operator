@@ -29,6 +29,19 @@ func GetResourcePoolByMoID(
 	return o.(*object.ResourcePool), nil
 }
 
+func GetResourcePoolByName(
+	ctx goctx.Context,
+	vimClient *vim25.Client,
+	finder *find.Finder,
+	rpName string) (*object.ResourcePool, error) {
+
+	o, err := finder.ResourcePool(ctx, rpName)
+	if err != nil {
+		return nil, err
+	}
+	return o, nil
+}
+
 // GetResourcePoolOwnerMoRef returns the ClusterComputeResource MoID that owns the ResourcePool.
 func GetResourcePoolOwnerMoRef(
 	ctx goctx.Context,

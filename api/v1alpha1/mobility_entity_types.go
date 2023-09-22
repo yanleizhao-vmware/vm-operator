@@ -46,7 +46,7 @@ type EntitySelector struct {
 	// NameRegexPattern is a regular expression to match the name of the entities.
 	NameRegexPattern string `json:"nameRegexPattern,omitempty"`
 
-	// Parent resource pool of the entities.
+	// Parent resource pool MoID of the entities.
 	ResourcePool string `json:"resourcePool,omitempty"`
 }
 

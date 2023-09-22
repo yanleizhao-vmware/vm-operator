@@ -152,25 +152,25 @@ func (vs *vSphereVMProvider) RelocateVirtualMachine(ctx goctx.Context, vm *vmopv
 	dstDsMoRef := dstDs.Reference()
 	vmCtx.Logger.Info("Dst datastore", "ds", dstDsMoRef)
 
-	dstVmNetworkName := "primary-vds-2"
+	dstVMNetworkName := "primary-vds-2"
 	dstNetwork, err := client.Finder().Network(vmCtx, supervisorRelocateSpec.VmNetworkName)
 	if err != nil {
 		return err
 	}
 	dstNetworkMoRef := dstNetwork.Reference()
 	vmCtx.Logger.Info("Dst network", "network", dstNetworkMoRef)
-	srcVmNetwork, err := GetNetworkFromVM(&vmCtx, vcVM)
+	srcVMNetwork, err := GetNetworkFromVM(&vmCtx, vcVM)
 	if err != nil {
 		return err
 	}
 	var deviceConfigSpecs []types.BaseVirtualDeviceConfigSpec
 	deviceConfigSpec := &types.VirtualDeviceConfigSpec{
 		Operation: types.VirtualDeviceConfigSpecOperationEdit,
-		Device:    srcVmNetwork,
+		Device:    srcVMNetwork,
 	}
 	deviceConfigSpec.Device.GetVirtualDevice().Backing = &types.VirtualEthernetCardNetworkBackingInfo{
 		VirtualDeviceDeviceBackingInfo: types.VirtualDeviceDeviceBackingInfo{
-			DeviceName: dstVmNetworkName,
+			DeviceName: dstVMNetworkName,
 		},
 	}
 	deviceConfigSpecs = append(deviceConfigSpecs, deviceConfigSpec)

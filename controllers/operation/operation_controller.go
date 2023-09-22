@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
+
 	vmopv1 "github.com/vmware-tanzu/vm-operator/api/v1alpha1"
 	"github.com/vmware-tanzu/vm-operator/pkg/context"
 	"github.com/vmware-tanzu/vm-operator/pkg/lib"
@@ -37,9 +38,8 @@ type Reconciler struct {
 	maxDeployThreads int
 }
 
-func (r *Reconciler) reconcileImport(ctx goctx.Context, operation *vmopv1.Operation) (ctrl.Result, error) {
+func (r *Reconciler) reconcileImportWithVMSpec(ctx goctx.Context, operation *vmopv1.Operation) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
-	logger.Info("Reconciling import", "Operation", operation)
 
 	// Log the operation.Spec.VmSpec.
 	logger.Info("VM Spec", "Spec", operation.Spec.VmSpec)
@@ -65,6 +65,63 @@ func (r *Reconciler) reconcileImport(ctx goctx.Context, operation *vmopv1.Operat
 	// Exit since VM already exists.
 	logger.Info("VM already exists", "VM", vm)
 	return ctrl.Result{}, nil
+}
+
+func (r *Reconciler) resolveEntitiesBySelector(ctx goctx.Context, entitySelector *vmopv1.EntitySelector) ([]vmopv1.EntityReference, error) {
+	logger := log.FromContext(ctx)
+	switch {
+	case entitySelector.ResourcePool != "":
+		vms, err := r.VMProvider.GetVsphereVMsByResPoolName(ctx, entitySelector.ResourcePool)
+		if err != nil {
+			return nil, err
+		}
+		logger.Info("Found VMs by resource pool", "VMs", vms)
+		return nil, nil
+	case entitySelector.NameRegexPattern != "":
+		return nil, fmt.Errorf("unsupported entity selector NameRegexPattern")
+	case entitySelector.Selector != nil:
+		return nil, fmt.Errorf("unsupported entity selector Selector")
+	default:
+		return nil, fmt.Errorf("unsupported entity selector")
+	}
+}
+
+func (r *Reconciler) resolveEntities(ctx goctx.Context, entityRef *vmopv1.EntitiesReference) ([]vmopv1.EntityReference, error) {
+	if entityRef.EntitySelector != nil {
+		return r.resolveEntitiesBySelector(ctx, entityRef.EntitySelector)
+	}
+
+	return nil, fmt.Errorf("unsupported entity reference")
+}
+
+func (r *Reconciler) reconcileImportWithEntities(ctx goctx.Context, operation *vmopv1.Operation, entitiesRef *vmopv1.EntitiesReference) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+
+	// Log the operation.Spec.Entities.
+	logger.Info("Reconcile Import", "Entities", operation.Spec.Entities)
+
+	entities, err := r.resolveEntities(ctx, entitiesRef)
+	if err != nil {
+		logger.Error(err, "Failed to resolve entities")
+		return ctrl.Result{}, err
+	}
+
+	logger.Info("Resolved entities", "entities", entities)
+
+	return ctrl.Result{}, nil
+}
+
+func (r *Reconciler) reconcileImport(ctx goctx.Context, operation *vmopv1.Operation) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+	logger.Info("Reconciling import", "Operation", operation)
+
+	// If operation.Spec.EntityName is set.
+	if operation.Spec.EntityName != "" {
+		return r.reconcileImportWithVMSpec(ctx, operation)
+	}
+
+	// If operation.Spec.EntityName is not set. Then entities must be set.
+	return r.reconcileImportWithEntities(ctx, operation, &operation.Spec.Entities)
 }
 
 func (r *Reconciler) exportVM(ctx goctx.Context, operation *vmopv1.Operation) error {

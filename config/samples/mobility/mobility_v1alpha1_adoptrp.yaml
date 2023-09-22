@@ -1,0 +1,25 @@
+apiVersion: vmoperator.vmware.com/v1alpha1
+kind: Operation
+metadata:
+  name: adopt-a-rp-op
+  namespace: supervisor-ns-0
+spec:
+  operationType: Import
+  entities: 
+    entitySelector:
+      kind: VsphereVMEntity
+      namespace: default
+      resourcePool: vsphere-rp-0
+  destination:
+    namespace: supervisor-ns-0
+---
+apiVersion: vmoperator.vmware.com/v1alpha1
+kind: Plan
+metadata:
+  name: adopt-a-rp-plan
+  namespace: supervisor-ns-0
+spec:
+  operations:
+    - kind: Operation
+      namespace: supervisor-ns-0
+      name: adopt-a-rp-op

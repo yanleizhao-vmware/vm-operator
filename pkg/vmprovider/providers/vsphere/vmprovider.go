@@ -517,3 +517,38 @@ func (vs *vSphereVMProvider) GetTasksByActID(ctx goctx.Context, actID string) (t
 	log.V(5).Info("found tasks", "actID", actID, "tasks", taskList)
 	return taskList, nil
 }
+
+func (vs *vSphereVMProvider) GetVsphereVMsByResPoolName(ctx goctx.Context, resPoolName string) ([]vmopv1.VsphereVM, error) {
+	var pool mo.ResourcePool
+
+	vcClient, err := vs.getVcClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	resPool, err := vcenter.GetResourcePoolByName(ctx, vcClient.VimClient(), vcClient.Finder(), resPoolName)
+	if err != nil {
+		return nil, err
+	}
+
+	log.V(0).Info("GetVsphereVMsByResPoolName", "resPool", resPoolName, "resPool", resPool.Reference())
+
+	err = resPool.Properties(ctx, resPool.Reference(), []string{"vm"}, &pool)
+	if err != nil {
+		return nil, err
+	}
+
+	log.V(0).Info("GetVsphereVMsByResPoolName", "resPool", resPoolName, "resPool", resPool.Reference(), "vms", pool.Vm)
+
+	numVMs := len(pool.Vm)
+	vsphereVMs := make([]vmopv1.VsphereVM, numVMs)
+	for idx, vm := range pool.Vm {
+		vsphereVMs[idx] = vmopv1.VsphereVM{
+			Spec: vmopv1.VsphereVMSpec{
+				ManagedObjectID: vm.Value,
+			},
+		}
+	}
+
+	return vsphereVMs, nil
+}
