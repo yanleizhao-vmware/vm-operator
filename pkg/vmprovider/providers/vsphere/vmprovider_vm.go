@@ -131,6 +131,8 @@ func (vs *vSphereVMProvider) RelocateVirtualMachine(ctx goctx.Context, vm *vmopv
 	}
 	vmCtx.Logger.Info("Relocating VM", "vm", vcVM.Reference())
 
+	return nil
+
 	dstHost, err := client.Finder().HostSystem(vmCtx, supervisorRelocateSpec.HostIp)
 	if err != nil {
 		return err

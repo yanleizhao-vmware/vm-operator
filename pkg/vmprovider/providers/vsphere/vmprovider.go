@@ -552,3 +552,44 @@ func (vs *vSphereVMProvider) GetVsphereVMsByResPoolName(ctx goctx.Context, resPo
 
 	return vsphereVMs, nil
 }
+
+func (vs *vSphereVMProvider) GetFolderNameBySupervisorNamespaceName(ctx goctx.Context, supervisorNamespaceName string) (string, error) {
+	log.V(0).Info("GetFolderByResPoolName", "resPool", supervisorNamespaceName)
+
+	vcClient, err := vs.getVcClient(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	// Step 1, find the root namespaces folder, via the name "Namespaces"
+	folder, err := vcClient.Finder().Folder(ctx, "Namespaces")
+	if err != nil {
+		return "", err
+	}
+
+	// Step 2, find the folder with the name of the supervisor namespace
+	var folderMo mo.Folder
+	err = folder.Properties(ctx, folder.Reference(), []string{"name", "childEntity"}, &folderMo)
+	if err != nil {
+		return "", err
+	}
+
+	for _, child := range folderMo.ChildEntity {
+		log.V(0).Info("GetFolderByResPoolName", "child", child)
+		if child.Type != "Folder" {
+			continue
+		}
+
+		var childFolder mo.Folder
+		err := folder.Properties(ctx, child, []string{"name", "namespace"}, &childFolder)
+		if err != nil {
+			return "", err
+		}
+
+		if *childFolder.Namespace == supervisorNamespaceName {
+			return childFolder.Name, nil
+		}
+	}
+
+	return "", fmt.Errorf("failed to find folder for supervisor namespace %s", supervisorNamespaceName)
+}

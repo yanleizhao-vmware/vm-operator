@@ -367,6 +367,10 @@ func (s *VMProvider) GetVsphereVMsByResPoolName(ctx context.Context, resPoolName
 	return nil, nil
 }
 
+func (s *VMProvider) GetFolderNameBySupervisorNamespaceName(ctx context.Context, resPoolName string) (string, error) {
+	return "", nil
+}
+
 func NewVMProvider() *VMProvider {
 	provider := VMProvider{
 		vmMap:             map[client.ObjectKey]*vmopv1.VirtualMachine{},

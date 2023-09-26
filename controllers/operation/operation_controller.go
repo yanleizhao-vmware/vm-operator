@@ -76,7 +76,15 @@ func (r *Reconciler) resolveEntitiesBySelector(ctx goctx.Context, entitySelector
 			return nil, err
 		}
 		logger.Info("Found VMs by resource pool", "VMs", vms)
-		return nil, nil
+		entityRefs := make([]vmopv1.EntityReference, len(vms))
+		for idx, vm := range vms {
+			entityRefs[idx] = vmopv1.EntityReference{
+				Kind:      vmopv1.VSphereVMEntityKind,
+				Namespace: vm.Namespace,
+				Name:      vm.Name,
+			}
+		}
+		return entityRefs, nil
 	case entitySelector.NameRegexPattern != "":
 		return nil, fmt.Errorf("unsupported entity selector NameRegexPattern")
 	case entitySelector.Selector != nil:
@@ -86,15 +94,32 @@ func (r *Reconciler) resolveEntitiesBySelector(ctx goctx.Context, entitySelector
 	}
 }
 
-func (r *Reconciler) resolveEntities(ctx goctx.Context, entityRef *vmopv1.EntitiesReference) ([]vmopv1.EntityReference, error) {
-	if entityRef.EntitySelector != nil {
-		return r.resolveEntitiesBySelector(ctx, entityRef.EntitySelector)
+func (r *Reconciler) resolveEntities(ctx goctx.Context, entitiesRef vmopv1.EntitiesReference) ([]vmopv1.EntityReference, error) {
+	if entitiesRef.EntitySelector != nil {
+		return r.resolveEntitiesBySelector(ctx, entitiesRef.EntitySelector)
 	}
 
 	return nil, fmt.Errorf("unsupported entity reference")
 }
 
-func (r *Reconciler) reconcileImportWithEntities(ctx goctx.Context, operation *vmopv1.Operation, entitiesRef *vmopv1.EntitiesReference) (ctrl.Result, error) {
+func (r *Reconciler) importEntitiesToSupervisorLocation(ctx goctx.Context, operation *vmopv1.Operation, entities []vmopv1.EntityReference) error {
+	logger := log.FromContext(ctx)
+
+	logger.Info("Importing entities to supervisor location", "entities", entities)
+
+	// Find target folder.
+	folder, err := r.VMProvider.GetFolderNameBySupervisorNamespaceName(ctx, operation.Spec.Destination.Namespace)
+	if err != nil {
+		logger.Error(err, "Failed to find target folder")
+		return err
+	}
+
+	logger.Info("Found target folder", "folder", folder)
+
+	return nil
+}
+
+func (r *Reconciler) reconcileImportWithEntities(ctx goctx.Context, operation *vmopv1.Operation, entitiesRef vmopv1.EntitiesReference) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
 	// Log the operation.Spec.Entities.
@@ -107,6 +132,13 @@ func (r *Reconciler) reconcileImportWithEntities(ctx goctx.Context, operation *v
 	}
 
 	logger.Info("Resolved entities", "entities", entities)
+
+	// Only support importing to sueprvisor location for now.
+	err = r.importEntitiesToSupervisorLocation(ctx, operation, entities)
+	if err != nil {
+		logger.Error(err, "Failed to import entities to supervisor location")
+		return ctrl.Result{}, err
+	}
 
 	return ctrl.Result{}, nil
 }
@@ -121,7 +153,7 @@ func (r *Reconciler) reconcileImport(ctx goctx.Context, operation *vmopv1.Operat
 	}
 
 	// If operation.Spec.EntityName is not set. Then entities must be set.
-	return r.reconcileImportWithEntities(ctx, operation, &operation.Spec.Entities)
+	return r.reconcileImportWithEntities(ctx, operation, operation.Spec.Entities)
 }
 
 func (r *Reconciler) exportVM(ctx goctx.Context, operation *vmopv1.Operation) error {

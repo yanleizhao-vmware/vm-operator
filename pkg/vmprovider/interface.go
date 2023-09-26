@@ -47,4 +47,5 @@ type VirtualMachineProviderInterface interface {
 	GetTasksByActID(ctx context.Context, actID string) (tasksInfo []vimTypes.TaskInfo, retErr error)
 
 	GetVsphereVMsByResPoolName(ctx context.Context, resPoolName string) ([]vmopv1.VsphereVM, error)
+	GetFolderNameBySupervisorNamespaceName(ctx context.Context, resPoolName string) (string, error)
 }
