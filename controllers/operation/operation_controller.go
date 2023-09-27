@@ -119,26 +119,28 @@ func (r *Reconciler) importEntitiesToSupervisorLocation(ctx goctx.Context, opera
 
 	logger.Info("Found target folder", "folder", folder)
 
-	vm := &vmopv1.VirtualMachine{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      operation.ObjectMeta.Name,
-			Namespace: operation.Namespace,
-		},
-		Spec: vmopv1.VirtualMachineSpec{
-			ClassName: "vmi-1546c9445cd02062f", // Adopting a VM cannot have class or image names
-			ImageName: "best-effort-xsmall",    // Adopting a VM cannot have class or image names
-		},
-		Status: vmopv1.VirtualMachineStatus{
-			UniqueID: "vm-85", // Hardcode for now, easy to grab from entities
-		},
-	}
+	for _, entity := range entities {
+		vm := &vmopv1.VirtualMachine{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      operation.ObjectMeta.Name,
+				Namespace: operation.Namespace,
+			},
+			Spec: vmopv1.VirtualMachineSpec{
+				ClassName: "vmi-1546c9445cd02062f", // Adopting a VM cannot have class or image names
+				ImageName: "best-effort-xsmall",    // Adopting a VM cannot have class or image names
+			},
+			Status: vmopv1.VirtualMachineStatus{
+				UniqueID: entity.ManagedObjectID,
+			},
+		}
 
-	err = r.VMProvider.RelocateVirtualMachine(ctx, vm, &vmopv1.RelocateSpec{
-		FolderName: folder,
-	})
-	if err != nil {
-		logger.Error(err, "Failed to relocate VM")
-		return err
+		err = r.VMProvider.RelocateVirtualMachine(ctx, vm, &vmopv1.RelocateSpec{
+			FolderName: folder,
+		})
+		if err != nil {
+			logger.Error(err, "Failed to relocate VM")
+			return err
+		}
 	}
 
 	return nil
