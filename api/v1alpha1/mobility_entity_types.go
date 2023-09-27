@@ -24,6 +24,10 @@ type EntityReference struct {
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
 	// Required
 	Name string `json:"name"`
+
+	// vSphere Managed Object ID of the referent.
+	// +optional
+	ManagedObjectID string `json:"managedObjectId,omitempty"`
 }
 
 type EntitySelector struct {

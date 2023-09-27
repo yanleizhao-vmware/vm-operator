@@ -131,67 +131,70 @@ func (vs *vSphereVMProvider) RelocateVirtualMachine(ctx goctx.Context, vm *vmopv
 	}
 	vmCtx.Logger.Info("Relocating VM", "vm", vcVM.Reference())
 
-	return nil
+	relocateSpec := types.VirtualMachineRelocateSpec{}
 
-	dstHost, err := client.Finder().HostSystem(vmCtx, supervisorRelocateSpec.HostIp)
-	if err != nil {
-		return err
-	}
-	dstHostMoRef := dstHost.Reference()
-	vmCtx.Logger.Info("Dst host", "host", dstHostMoRef)
-
-	dstPool, err := client.Finder().ResourcePool(vmCtx, supervisorRelocateSpec.ResourcePoolName)
-	if err != nil {
-		return err
-	}
-	dstPoolMoRef := dstPool.Reference()
-	vmCtx.Logger.Info("Dst resource pool", "rp", dstPoolMoRef)
-
-	dstDs, err := client.Finder().Datastore(vmCtx, supervisorRelocateSpec.DatastoreName)
-	if err != nil {
-		return err
-	}
-	dstDsMoRef := dstDs.Reference()
-	vmCtx.Logger.Info("Dst datastore", "ds", dstDsMoRef)
-
-	dstVMNetworkName := "primary-vds-2"
-	dstNetwork, err := client.Finder().Network(vmCtx, supervisorRelocateSpec.VmNetworkName)
-	if err != nil {
-		return err
-	}
-	dstNetworkMoRef := dstNetwork.Reference()
-	vmCtx.Logger.Info("Dst network", "network", dstNetworkMoRef)
-	srcVMNetwork, err := GetNetworkFromVM(&vmCtx, vcVM)
-	if err != nil {
-		return err
-	}
-	var deviceConfigSpecs []types.BaseVirtualDeviceConfigSpec
-	deviceConfigSpec := &types.VirtualDeviceConfigSpec{
-		Operation: types.VirtualDeviceConfigSpecOperationEdit,
-		Device:    srcVMNetwork,
-	}
-	deviceConfigSpec.Device.GetVirtualDevice().Backing = &types.VirtualEthernetCardNetworkBackingInfo{
-		VirtualDeviceDeviceBackingInfo: types.VirtualDeviceDeviceBackingInfo{
-			DeviceName: dstVMNetworkName,
-		},
-	}
-	deviceConfigSpecs = append(deviceConfigSpecs, deviceConfigSpec)
-
-	dstFolder, err := client.Finder().Folder(vmCtx, supervisorRelocateSpec.FolderName)
-	if err != nil {
-		return err
-	}
-	dstFolderMoRef := dstFolder.Reference()
-	vmCtx.Logger.Info("Dst folder", "folder", dstFolderMoRef)
-
-	relocateSpec := types.VirtualMachineRelocateSpec{
-		Folder:       &dstFolderMoRef,
-		Datastore:    &dstDsMoRef,
-		Pool:         &dstPoolMoRef,
-		Host:         &dstHostMoRef,
-		DeviceChange: deviceConfigSpecs,
+	if supervisorRelocateSpec.HostIp != "" {
+		dstHost, err := client.Finder().HostSystem(vmCtx, supervisorRelocateSpec.HostIp)
+		if err != nil {
+			return err
+		}
+		dstHostMoRef := dstHost.Reference()
+		relocateSpec.Host = &dstHostMoRef
+		vmCtx.Logger.Info("Dst host", "host", dstHostMoRef)
 	}
 
+	if supervisorRelocateSpec.ResourcePoolName != "" {
+		dstPool, err := client.Finder().ResourcePool(vmCtx, supervisorRelocateSpec.ResourcePoolName)
+		if err != nil {
+			return err
+		}
+		dstPoolMoRef := dstPool.Reference()
+		relocateSpec.Pool = &dstPoolMoRef
+		vmCtx.Logger.Info("Dst resource pool", "rp", dstPoolMoRef)
+	}
+
+	if supervisorRelocateSpec.DatastoreName != "" {
+		dstDs, err := client.Finder().Datastore(vmCtx, supervisorRelocateSpec.DatastoreName)
+		if err != nil {
+			return err
+		}
+		dstDsMoRef := dstDs.Reference()
+		relocateSpec.Datastore = &dstDsMoRef
+		vmCtx.Logger.Info("Dst datastore", "ds", dstDsMoRef)
+	}
+
+	if supervisorRelocateSpec.VmNetworkName != "" {
+		dstVMNetworkName := supervisorRelocateSpec.VmNetworkName
+		srcVMNetwork, err := GetNetworkFromVM(&vmCtx, vcVM)
+		if err != nil {
+			return err
+		}
+		var deviceConfigSpecs []types.BaseVirtualDeviceConfigSpec
+		deviceConfigSpec := &types.VirtualDeviceConfigSpec{
+			Operation: types.VirtualDeviceConfigSpecOperationEdit,
+			Device:    srcVMNetwork,
+		}
+		deviceConfigSpec.Device.GetVirtualDevice().Backing = &types.VirtualEthernetCardNetworkBackingInfo{
+			VirtualDeviceDeviceBackingInfo: types.VirtualDeviceDeviceBackingInfo{
+				DeviceName: dstVMNetworkName,
+			},
+		}
+		deviceConfigSpecs = append(deviceConfigSpecs, deviceConfigSpec)
+		vmCtx.Logger.Info("Device change", "deviceSpecs", deviceConfigSpecs)
+		relocateSpec.DeviceChange = deviceConfigSpecs
+	}
+
+	if supervisorRelocateSpec.FolderName != "" {
+		dstFolder, err := client.Finder().Folder(vmCtx, supervisorRelocateSpec.FolderName)
+		if err != nil {
+			return err
+		}
+		dstFolderMoRef := dstFolder.Reference()
+		vmCtx.Logger.Info("Dst folder", "folder", dstFolderMoRef)
+		relocateSpec.Folder = &dstFolderMoRef
+	}
+
+	vmCtx.Logger.Info("Relocate spec", "spec", relocateSpec)
 	return virtualmachine.RelocateVirtualMachine(vmCtx, vcVM, relocateSpec)
 }
 

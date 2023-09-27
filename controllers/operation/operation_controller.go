@@ -79,9 +79,10 @@ func (r *Reconciler) resolveEntitiesBySelector(ctx goctx.Context, entitySelector
 		entityRefs := make([]vmopv1.EntityReference, len(vms))
 		for idx, vm := range vms {
 			entityRefs[idx] = vmopv1.EntityReference{
-				Kind:      vmopv1.VSphereVMEntityKind,
-				Namespace: vm.Namespace,
-				Name:      vm.Name,
+				Kind:            vmopv1.VSphereVMEntityKind,
+				Namespace:       vm.Namespace,
+				Name:            vm.Name,
+				ManagedObjectID: vm.Spec.ManagedObjectID,
 			}
 		}
 		return entityRefs, nil
@@ -107,7 +108,9 @@ func (r *Reconciler) importEntitiesToSupervisorLocation(ctx goctx.Context, opera
 
 	logger.Info("Importing entities to supervisor location", "entities", entities)
 
-	// Find target folder.
+	// Find target folder. Seems like we could get the folder directly from namespace annotation:
+	// Annotations:  vmware-system-resource-pool: resgroup-83
+	// 				 vmware-system-vm-folder: group-v84
 	folder, err := r.VMProvider.GetFolderNameBySupervisorNamespaceName(ctx, operation.Spec.Destination.Namespace)
 	if err != nil {
 		logger.Error(err, "Failed to find target folder")
@@ -115,6 +118,28 @@ func (r *Reconciler) importEntitiesToSupervisorLocation(ctx goctx.Context, opera
 	}
 
 	logger.Info("Found target folder", "folder", folder)
+
+	vm := &vmopv1.VirtualMachine{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      operation.ObjectMeta.Name,
+			Namespace: operation.Namespace,
+		},
+		Spec: vmopv1.VirtualMachineSpec{
+			ClassName: "vmi-1546c9445cd02062f", // Adopting a VM cannot have class or image names
+			ImageName: "best-effort-xsmall",    // Adopting a VM cannot have class or image names
+		},
+		Status: vmopv1.VirtualMachineStatus{
+			UniqueID: "vm-85", // Hardcode for now, easy to grab from entities
+		},
+	}
+
+	err = r.VMProvider.RelocateVirtualMachine(ctx, vm, &vmopv1.RelocateSpec{
+		FolderName: folder,
+	})
+	if err != nil {
+		logger.Error(err, "Failed to relocate VM")
+		return err
+	}
 
 	return nil
 }
