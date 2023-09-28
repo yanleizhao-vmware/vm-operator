@@ -50,6 +50,8 @@ func findVMByMoID(
 	finder *find.Finder,
 	moID string) (*object.VirtualMachine, error) {
 
+	vmCtx.Logger.Info("Finding VM via MoID", "moID", moID)
+
 	ref, err := finder.ObjectReference(vmCtx, types.ManagedObjectReference{Type: "VirtualMachine", Value: moID})
 	if err != nil {
 		return nil, err

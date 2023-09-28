@@ -543,8 +543,15 @@ func (vs *vSphereVMProvider) GetVsphereVMsByResPoolName(ctx goctx.Context, resPo
 	numVMs := len(pool.Vm)
 	vsphereVMs := make([]vmopv1.VsphereVM, numVMs)
 	for idx, vm := range pool.Vm {
+		vmObj := object.NewVirtualMachine(vcClient.VimClient(), vm)
+		var vmMo mo.VirtualMachine
+		err = vmObj.Properties(ctx, vmObj.Reference(), []string{"name"}, &vmMo)
+		if err != nil {
+			return nil, err
+		}
 		vsphereVMs[idx] = vmopv1.VsphereVM{
 			Spec: vmopv1.VsphereVMSpec{
+				Name:            vmMo.Name,
 				ManagedObjectID: vm.Value,
 			},
 		}

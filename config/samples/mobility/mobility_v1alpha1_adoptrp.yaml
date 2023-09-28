@@ -18,6 +18,7 @@ spec:
       networkType: vsphere-distributed
     className: best-effort-xsmall
     imageName: vmi-1546c9445cd02062f
+    storageClass: wcpglobal-storage-profile
 ---
 apiVersion: vmoperator.vmware.com/v1alpha1
 kind: Plan

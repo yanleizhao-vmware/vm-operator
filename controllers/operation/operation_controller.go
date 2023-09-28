@@ -38,32 +38,43 @@ type Reconciler struct {
 	maxDeployThreads int
 }
 
-func (r *Reconciler) reconcileImportWithVMSpec(ctx goctx.Context, operation *vmopv1.Operation) (ctrl.Result, error) {
+func (r *Reconciler) createSupervisorVM(ctx goctx.Context, operation *vmopv1.Operation, vmSpec *vmopv1.VirtualMachineSpec, vmName string, vmMoID string) error {
 	logger := log.FromContext(ctx)
 
 	// Log the operation.Spec.VmSpec.
-	logger.Info("VM Spec", "Spec", operation.Spec.VmSpec)
+	logger.Info("VM Spec", "Spec", vmSpec)
 
 	// Find the VM referenced by the Operation
 	vm := &vmopv1.VirtualMachine{}
-	if err := r.Get(ctx, client.ObjectKey{Name: operation.Spec.EntityName, Namespace: operation.Namespace}, vm); err != nil {
+	if err := r.Get(ctx, client.ObjectKey{Name: vmName, Namespace: operation.Namespace}, vm); err != nil {
 		// Create a new VM.
 		vm = &vmopv1.VirtualMachine{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      operation.Spec.EntityName,
+				Name:      vmName,
 				Namespace: operation.Namespace,
 			},
-			Spec: operation.Spec.VmSpec,
+			Spec: *vmSpec,
+		}
+		if vmMoID != "" {
+			vm.Status.UniqueID = vmMoID
 		}
 		if err := r.Create(ctx, vm); err != nil {
 			logger.Error(err, "Failed to create VM referenced by Operation", "Operation", operation)
-			return ctrl.Result{}, err
+			return err
 		}
-		return ctrl.Result{}, nil
+		return nil
+	} else {
+		// Exit since VM already exists.
+		logger.Info("VM already exists", "VM", vm)
 	}
+	return nil
+}
 
-	// Exit since VM already exists.
-	logger.Info("VM already exists", "VM", vm)
+func (r *Reconciler) reconcileImportWithVMSpec(ctx goctx.Context, operation *vmopv1.Operation) (ctrl.Result, error) {
+	err := r.createSupervisorVM(ctx, operation, &operation.Spec.VmSpec, operation.Spec.EntityName, "")
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 	return ctrl.Result{}, nil
 }
 
@@ -81,7 +92,7 @@ func (r *Reconciler) resolveEntitiesBySelector(ctx goctx.Context, entitySelector
 			entityRefs[idx] = vmopv1.EntityReference{
 				Kind:            vmopv1.VSphereVMEntityKind,
 				Namespace:       vm.Namespace,
-				Name:            vm.Name,
+				Name:            vm.Spec.Name,
 				ManagedObjectID: vm.Spec.ManagedObjectID,
 			}
 		}
@@ -131,13 +142,10 @@ func (r *Reconciler) importEntitiesToSupervisorLocation(ctx goctx.Context, opera
 	for _, entity := range entities {
 		vm := &vmopv1.VirtualMachine{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      operation.ObjectMeta.Name,
+				Name:      entity.Name,
 				Namespace: operation.Namespace,
 			},
-			Spec: vmopv1.VirtualMachineSpec{
-				ClassName: "vmi-1546c9445cd02062f", // Adopting a VM cannot have class or image names
-				ImageName: "best-effort-xsmall",    // Adopting a VM cannot have class or image names
-			},
+			Spec: operation.Spec.VmSpec,
 			Status: vmopv1.VirtualMachineStatus{
 				UniqueID: entity.ManagedObjectID,
 			},
@@ -152,6 +160,13 @@ func (r *Reconciler) importEntitiesToSupervisorLocation(ctx goctx.Context, opera
 		})
 		if err != nil {
 			logger.Error(err, "Failed to relocate VM")
+			return err
+		}
+
+		logger.Info("Import VM into supervisor namespace", "VM", vm)
+		err = r.createSupervisorVM(ctx, operation, &vm.Spec, vm.Name, vm.Status.UniqueID)
+		if err != nil {
+			logger.Error(err, "Failed to create supervisor VM")
 			return err
 		}
 	}
