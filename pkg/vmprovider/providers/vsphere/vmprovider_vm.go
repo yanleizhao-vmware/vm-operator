@@ -129,7 +129,7 @@ func (vs *vSphereVMProvider) RelocateVirtualMachine(ctx goctx.Context, vm *vmopv
 		// VM does not exist.
 		return nil
 	}
-	vmCtx.Logger.Info("Relocating VM", "vm", vcVM.Reference())
+	vmCtx.Logger.Info("Relocating VM", "vm", vcVM.Reference(), "supervisorRelocateSpec", supervisorRelocateSpec)
 
 	relocateSpec := types.VirtualMachineRelocateSpec{}
 
@@ -143,12 +143,22 @@ func (vs *vSphereVMProvider) RelocateVirtualMachine(ctx goctx.Context, vm *vmopv
 		vmCtx.Logger.Info("Dst host", "host", dstHostMoRef)
 	}
 
-	if supervisorRelocateSpec.ResourcePoolName != "" {
-		dstPool, err := client.Finder().ResourcePool(vmCtx, supervisorRelocateSpec.ResourcePoolName)
-		if err != nil {
-			return err
+	if supervisorRelocateSpec.ResourcePoolName != "" || supervisorRelocateSpec.ResourcePoolMoID != "" {
+		var dstPoolMoRef types.ManagedObjectReference
+
+		if supervisorRelocateSpec.ResourcePoolName != "" {
+			dstPool, err := client.Finder().ResourcePool(vmCtx, supervisorRelocateSpec.ResourcePoolName)
+			if err != nil {
+				return err
+			}
+			dstPoolMoRef = dstPool.Reference()
+		} else {
+			dstPoolMoRef = types.ManagedObjectReference{
+				Type:  "ResourcePool",
+				Value: supervisorRelocateSpec.ResourcePoolMoID,
+			}
 		}
-		dstPoolMoRef := dstPool.Reference()
+
 		relocateSpec.Pool = &dstPoolMoRef
 		vmCtx.Logger.Info("Dst resource pool", "rp", dstPoolMoRef)
 	}

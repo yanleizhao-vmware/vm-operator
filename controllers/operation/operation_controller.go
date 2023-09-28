@@ -119,6 +119,15 @@ func (r *Reconciler) importEntitiesToSupervisorLocation(ctx goctx.Context, opera
 
 	logger.Info("Found target folder", "folder", folder)
 
+	ns := &corev1.Namespace{}
+	if err := r.Get(ctx, client.ObjectKey{Name: operation.Spec.Destination.Namespace}, ns); err != nil {
+		logger.Error(err, "Failed to get namespace")
+		return err
+	}
+
+	logger.Info("Found namespace", "namespace", ns)
+	logger.Info("Namespace resource pool", "respool", ns.Annotations["vmware-system-resource-pool"])
+
 	for _, entity := range entities {
 		vm := &vmopv1.VirtualMachine{
 			ObjectMeta: metav1.ObjectMeta{
@@ -134,8 +143,12 @@ func (r *Reconciler) importEntitiesToSupervisorLocation(ctx goctx.Context, opera
 			},
 		}
 
+		logger.Info("Relocating VM", "VM", vm)
+
 		err = r.VMProvider.RelocateVirtualMachine(ctx, vm, &vmopv1.RelocateSpec{
-			FolderName: folder,
+			FolderName:       folder,
+			VmNetworkName:    operation.Spec.VmSpec.NetworkInterfaces[0].NetworkName,
+			ResourcePoolMoID: ns.Annotations["vmware-system-resource-pool"],
 		})
 		if err != nil {
 			logger.Error(err, "Failed to relocate VM")

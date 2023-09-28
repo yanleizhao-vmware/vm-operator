@@ -12,6 +12,12 @@ spec:
       resourcePool: vsphere-rp-0
   destination:
     namespace: supervisor-ns-0
+  vmSpec:
+    networkInterfaces:
+    - networkName: "primary"
+      networkType: vsphere-distributed
+    className: best-effort-xsmall
+    imageName: vmi-1546c9445cd02062f
 ---
 apiVersion: vmoperator.vmware.com/v1alpha1
 kind: Plan

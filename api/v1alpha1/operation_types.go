@@ -40,6 +40,7 @@ type OperationReference struct {
 type RelocateSpec struct {
 	HostIp           string `json:"hostIp"`
 	ResourcePoolName string `json:"resourcePoolName"`
+	ResourcePoolMoID string `json:"resourcePoolMoID"`
 	DatastoreName    string `json:"datastoreName"`
 	VmNetworkName    string `json:"vmNetworkName"`
 	FolderName       string `json:"folderName"`
