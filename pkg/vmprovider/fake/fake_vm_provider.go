@@ -371,6 +371,10 @@ func (s *VMProvider) GetFolderNameBySupervisorNamespaceName(ctx context.Context,
 	return "", nil
 }
 
+func (s *VMProvider) ReconfigureVirtualMachine(ctx context.Context, vm *vmopv1.VirtualMachine, spec *vmopv1.ReconfigureSpec) error {
+	return nil
+}
+
 func NewVMProvider() *VMProvider {
 	provider := VMProvider{
 		vmMap:             map[client.ObjectKey]*vmopv1.VirtualMachine{},

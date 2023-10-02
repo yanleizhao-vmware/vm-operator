@@ -40,6 +40,7 @@ import (
 	"github.com/vmware-tanzu/vm-operator/pkg/vmprovider/providers/vsphere/constants"
 	"github.com/vmware-tanzu/vm-operator/pkg/vmprovider/providers/vsphere/contentlibrary"
 	"github.com/vmware-tanzu/vm-operator/pkg/vmprovider/providers/vsphere/vcenter"
+	"github.com/vmware-tanzu/vm-operator/pkg/vmprovider/providers/vsphere/virtualmachine"
 )
 
 const (
@@ -599,4 +600,79 @@ func (vs *vSphereVMProvider) GetFolderNameBySupervisorNamespaceName(ctx goctx.Co
 	}
 
 	return "", fmt.Errorf("failed to find folder for supervisor namespace %s", supervisorNamespaceName)
+}
+
+func (vs *vSphereVMProvider) ReconfigureVirtualMachine(ctx goctx.Context, vm *vmopv1.VirtualMachine, spec *vmopv1.ReconfigureSpec) error {
+	vmCtx := context.VirtualMachineContext{
+		Context: goctx.WithValue(ctx, types.ID{}, vs.getOpID(vm, "reconfigureVM")),
+		Logger:  log.WithValues("vmName", vm.NamespacedName()),
+		VM:      vm,
+	}
+
+	client, err := vs.getVcClient(vmCtx)
+	if err != nil {
+		return err
+	}
+
+	vcVM, err := vs.getVM(vmCtx, client, false)
+	if err != nil {
+		return err
+	} else if vcVM == nil {
+		// VM does not exist.
+		return nil
+	}
+
+	reconfigureSpec := types.VirtualMachineConfigSpec{}
+
+	if spec.VmNetworkName != "" {
+		targetNetwork, err := client.Finder().Network(vmCtx, spec.VmNetworkName)
+		if err != nil {
+			return err
+		}
+		targetNetworkRef := targetNetwork.Reference()
+		log.V(0).Info("ReconfigureVirtualMachine", "targetNetworkRef", targetNetworkRef)
+
+		var dvp *object.DistributedVirtualPortgroup
+		var ok bool
+		if dvp, ok = targetNetwork.(*object.DistributedVirtualPortgroup); !ok {
+			return errors.Errorf("network %q is not a distributed virtual portgroup", spec.VmNetworkName)
+		}
+		portGroupKey := dvp.Reference().Value
+		var dvpMo mo.DistributedVirtualPortgroup
+		err = dvp.Properties(ctx, dvp.Reference(), []string{"config.distributedVirtualSwitch"}, &dvpMo)
+		if err != nil {
+			return err
+		}
+
+		dvsRef := dvpMo.Config.DistributedVirtualSwitch
+		var dvsMo mo.DistributedVirtualSwitch
+		err = dvp.Properties(ctx, *dvsRef, []string{"uuid"}, &dvsMo)
+		if err != nil {
+			return err
+		}
+		switchUuid := dvsMo.Uuid
+
+		srcVMNetwork, err := GetNetworkFromVM(&vmCtx, vcVM)
+		if err != nil {
+			return err
+		}
+		log.V(0).Info("ReconfigureVirtualMachine", "srcVMNetwork", srcVMNetwork)
+
+		deviceConfigSpec := &types.VirtualDeviceConfigSpec{
+			Operation: types.VirtualDeviceConfigSpecOperationEdit,
+			Device:    srcVMNetwork,
+		}
+
+		ethCard := deviceConfigSpec.Device.(*types.VirtualVmxnet3)
+		ethCard.Backing = &types.VirtualEthernetCardDistributedVirtualPortBackingInfo{
+			Port: types.DistributedVirtualSwitchPortConnection{
+				PortgroupKey: portGroupKey,
+				SwitchUuid:   switchUuid,
+			},
+		}
+
+		reconfigureSpec.DeviceChange = append(reconfigureSpec.DeviceChange, deviceConfigSpec)
+	}
+
+	return virtualmachine.ReconfigureVirtualMachine(vmCtx, vcVM, reconfigureSpec)
 }

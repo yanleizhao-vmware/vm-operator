@@ -151,11 +151,20 @@ func (r *Reconciler) importEntitiesToSupervisorLocation(ctx goctx.Context, opera
 			},
 		}
 
+		logger.Info("Rconfigure VM Network if required", "VM", vm)
+
+		err = r.VMProvider.ReconfigureVirtualMachine(ctx, vm, &vmopv1.ReconfigureSpec{
+			VmNetworkName: operation.Spec.VmSpec.NetworkInterfaces[0].NetworkName,
+		})
+		if err != nil {
+			logger.Error(err, "Failed to reconfigure VM network")
+			return err
+		}
+
 		logger.Info("Relocating VM", "VM", vm)
 
 		err = r.VMProvider.RelocateVirtualMachine(ctx, vm, &vmopv1.RelocateSpec{
 			FolderName:       folder,
-			VmNetworkName:    operation.Spec.VmSpec.NetworkInterfaces[0].NetworkName,
 			ResourcePoolMoID: ns.Annotations["vmware-system-resource-pool"],
 		})
 		if err != nil {

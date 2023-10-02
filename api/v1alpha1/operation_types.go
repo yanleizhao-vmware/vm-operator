@@ -46,6 +46,10 @@ type RelocateSpec struct {
 	FolderName       string `json:"folderName"`
 }
 
+type ReconfigureSpec struct {
+	VmNetworkName string `json:"vmNetworkName"`
+}
+
 // OperationSpec defines the desired state of Operation
 type OperationSpec struct {
 	OperationType OperationType               `json:"operationType"`

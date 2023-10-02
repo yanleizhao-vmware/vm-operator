@@ -20,6 +20,7 @@ import (
 type VirtualMachineProviderInterface interface {
 	CreateOrUpdateVirtualMachine(ctx context.Context, vm *vmopv1.VirtualMachine) error
 	RelocateVirtualMachine(ctx context.Context, vm *vmopv1.VirtualMachine, spec *vmopv1.RelocateSpec) error
+	ReconfigureVirtualMachine(ctx context.Context, vm *vmopv1.VirtualMachine, spec *vmopv1.ReconfigureSpec) error
 	DeleteVirtualMachine(ctx context.Context, vm *vmopv1.VirtualMachine) error
 	PublishVirtualMachine(ctx context.Context, vm *vmopv1.VirtualMachine,
 		vmPub *vmopv1.VirtualMachinePublishRequest, cl *imgregv1a1.ContentLibrary, actID string) (string, error)
