@@ -17,6 +17,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/ovf"
+	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/task"
 	"github.com/vmware/govmomi/vapi/library"
 	"github.com/vmware/govmomi/vim25/mo"
@@ -675,4 +676,34 @@ func (vs *vSphereVMProvider) ReconfigureVirtualMachine(ctx goctx.Context, vm *vm
 	}
 
 	return virtualmachine.ReconfigureVirtualMachine(vmCtx, vcVM, reconfigureSpec)
+}
+
+func (vs *vSphereVMProvider) GetVsphereVmPowerState(ctx goctx.Context, vm *vmopv1.VirtualMachine) (vmopv1.VirtualMachinePowerState, error) {
+	vmCtx := context.VirtualMachineContext{
+		Context: goctx.WithValue(ctx, types.ID{}, vs.getOpID(vm, "reconfigureVM")),
+		Logger:  log.WithValues("vmName", vm.NamespacedName()),
+		VM:      vm,
+	}
+
+	client, err := vs.getVcClient(vmCtx)
+	if err != nil {
+		return "", err
+	}
+
+	vcVM, err := vs.getVM(vmCtx, client, false)
+	if err != nil {
+		return "", err
+	} else if vcVM == nil {
+		// VM does not exist.
+		return "", nil
+	}
+
+	pc := property.DefaultCollector(client.VimClient())
+	var vmMo mo.VirtualMachine
+	err = pc.RetrieveOne(ctx, vcVM.Reference(), []string{"runtime.powerState"}, &vmMo)
+	if err != nil {
+		return "", err
+	}
+
+	return vmopv1.VirtualMachinePowerState(vmMo.Runtime.PowerState), nil
 }

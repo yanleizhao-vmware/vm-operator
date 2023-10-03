@@ -151,6 +151,13 @@ func (r *Reconciler) importEntitiesToSupervisorLocation(ctx goctx.Context, opera
 			},
 		}
 
+		logger.Info("Adjust the power state according to the current vSpher VM power state", "VM", vm)
+		vm.Spec.PowerState, err = r.VMProvider.GetVsphereVmPowerState(ctx, vm)
+		if err != nil {
+			logger.Error(err, "Failed to get vSphere VM power state")
+			return err
+		}
+
 		logger.Info("Rconfigure VM Network if required", "VM", vm)
 
 		err = r.VMProvider.ReconfigureVirtualMachine(ctx, vm, &vmopv1.ReconfigureSpec{

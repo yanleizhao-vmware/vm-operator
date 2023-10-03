@@ -375,6 +375,10 @@ func (s *VMProvider) ReconfigureVirtualMachine(ctx context.Context, vm *vmopv1.V
 	return nil
 }
 
+func (s *VMProvider) GetVsphereVmPowerState(ctx context.Context, vm *vmopv1.VirtualMachine) (vmopv1.VirtualMachinePowerState, error) {
+	return "", nil
+}
+
 func NewVMProvider() *VMProvider {
 	provider := VMProvider{
 		vmMap:             map[client.ObjectKey]*vmopv1.VirtualMachine{},

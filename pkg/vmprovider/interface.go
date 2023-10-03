@@ -49,4 +49,5 @@ type VirtualMachineProviderInterface interface {
 
 	GetVsphereVMsByResPoolName(ctx context.Context, resPoolName string) ([]vmopv1.VsphereVM, error)
 	GetFolderNameBySupervisorNamespaceName(ctx context.Context, resPoolName string) (string, error)
+	GetVsphereVmPowerState(ctx context.Context, vm *vmopv1.VirtualMachine) (vmopv1.VirtualMachinePowerState, error)
 }
